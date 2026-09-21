@@ -45,7 +45,6 @@ class OpenAIProvider:
         }
         payload: dict[str, Any] = {
             "model": self.spec.model,
-            "temperature": self.spec.temperature,
             "max_tokens": self.spec.max_tokens,
             "messages": [
                 {"role": "system", "content": system_prompt},
@@ -60,6 +59,8 @@ class OpenAIProvider:
                 },
             },
         }
+        if self.spec.temperature is not None:
+            payload["temperature"] = self.spec.temperature
         payload.update(self.spec.extra)
 
         url = f"{base}/chat/completions"

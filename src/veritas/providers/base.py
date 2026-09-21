@@ -30,8 +30,8 @@ class ModelSpec:
 
     provider: str
     model: str
-    temperature: float = 0.0
-    max_tokens: int = 4096
+    temperature: float | None = None
+    max_tokens: int = 16000
     timeout: float = 120.0
     max_retries: int = 3
     base_url: str | None = None

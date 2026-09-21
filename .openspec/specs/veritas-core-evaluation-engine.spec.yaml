@@ -40,6 +40,8 @@ test_plan:
 - 'Unit test: configuration loading with ${ENV_VAR} interpolation, profile resolution and missing-secret error reporting.'
 - 'Unit test: TLS verification defaults to on, accepts a CA bundle path or the system trust store, and prints a warning naming the endpoint when it is disabled.'
 - 'Unit test: TLS values interpolated from the environment arrive as strings and are read as booleans, not as file paths.'
+- 'Unit test: sampling parameters are omitted from a provider request unless explicitly configured, and are sent when they are.'
+- 'Unit test: a 429 reporting an exhausted quota fails immediately, while an ordinary rate limit is still retried.'
 - 'Unit test: a gate evaluated with judge errors fails, names the failed judges, and the behaviour can be disabled explicitly.'
 - 'Integration test: an evaluation against an unreachable provider exits 3 with FAIL rather than 0 with PASS.'
 - 'Unit test: profile discovery resolves the shipped profiles for an artifact whose config lives in a subdirectory, under both an editable and a built install.'
@@ -66,6 +68,11 @@ eval_plan:
   metrics:
   - Evidence coverage percentage reported for the claim graph.
 technical_notes: |
+  Provider requests carry only what was configured. A parameter nobody set is
+  not sent: vendors deprecate them (current Claude models reject `temperature`
+  with a 400), and a default that is invisible in configuration is a default
+  nobody can debug.
+
   Model ids are configuration, never code: the shipped examples name current ids
   as documentation, and tests must not depend on those literals. The OpenSpec
   template's own agents (spec review, issue auto-fix) carry GitHub Models

@@ -54,12 +54,13 @@ class GoogleProvider:
             "systemInstruction": {"parts": [{"text": system_prompt}]},
             "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
             "generationConfig": {
-                "temperature": self.spec.temperature,
                 "maxOutputTokens": self.spec.max_tokens,
                 "responseMimeType": "application/json",
                 "responseSchema": _gemini_schema(json_schema_for(schema)),
             },
         }
+        if self.spec.temperature is not None:
+            payload["generationConfig"]["temperature"] = self.spec.temperature
         payload.update(self.spec.extra)
 
         url = f"{base}/models/{self.spec.model}:generateContent"

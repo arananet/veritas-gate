@@ -61,6 +61,11 @@ Guidelines:
   `gpt-5.6-terra`, `gemini-3.1-pro`. The OpenSpec template's own spec-review and
   issue-autofix agents were moved off their stale ids too. The example-paper test no longer names the default
   ids, so bumping a model cannot break it (spec: veritas-core-evaluation-engine).
+- `temperature` is omitted from a request unless it is explicitly configured, and the
+  default `max_tokens` is now 16000. Current Claude models reject `temperature` with a
+  400, so every judge failed against them (spec: veritas-core-evaluation-engine).
+- A 429 that reports an exhausted balance or spent quota fails immediately instead of
+  being retried three times (spec: veritas-core-evaluation-engine).
 - `VERITAS_TLS_VERIFY` is read by the shipped example configs, so TLS behaviour is set
   once in `.env` rather than by editing YAML. String values interpolated from the
   environment (`true`, `false`, `truststore`, a path) are all accepted — previously

@@ -283,3 +283,88 @@ def test_string_booleans_from_env_interpolation_can_disable_verification(
     http._INSECURE_WARNED.clear()
     assert build_verify(ModelSpec(provider="anthropic", model="m", tls_verify=value)) is False
     assert "verification is disabled" in capsys.readouterr().err
+
+
+def test_temperature_is_omitted_unless_it_is_configured(serve, judge_payload) -> None:
+    """Regression: current Claude models return 400 for a `temperature` field."""
+    seen: list[dict[str, Any]] = []
+
+    def handler(path: str, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+        seen.append(body)
+        return 200, {
+            "content": [{"type": "tool_use", "name": "emit_evaluation", "input": judge_payload}]
+        }
+
+    with serve(handler) as server:
+        _run(build_provider(spec("anthropic", server.base_url)), "s", "u")
+    assert "temperature" not in seen[0]
+
+
+def test_temperature_is_sent_when_it_is_configured(serve, judge_payload) -> None:
+    seen: list[dict[str, Any]] = []
+
+    def handler(path: str, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+        seen.append(body)
+        return 200, {
+            "content": [{"type": "tool_use", "name": "emit_evaluation", "input": judge_payload}]
+        }
+
+    with serve(handler) as server:
+        _run(build_provider(spec("anthropic", server.base_url, temperature=0.2)), "s", "u")
+    assert seen[0]["temperature"] == 0.2
+
+
+def test_openai_omits_temperature_by_default(serve, judge_payload) -> None:
+    seen: list[dict[str, Any]] = []
+
+    def handler(path: str, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+        seen.append(body)
+        return 200, {"choices": [{"message": {"content": json.dumps(judge_payload)}}]}
+
+    with serve(handler) as server:
+        _run(build_provider(spec("openai", server.base_url)), "s", "u")
+    assert "temperature" not in seen[0]
+
+
+def test_google_omits_temperature_by_default(serve, judge_payload) -> None:
+    seen: list[dict[str, Any]] = []
+
+    def handler(path: str, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+        seen.append(body)
+        return 200, {"candidates": [{"content": {"parts": [{"text": json.dumps(judge_payload)}]}}]}
+
+    with serve(handler) as server:
+        _run(build_provider(spec("google", server.base_url)), "s", "u")
+    assert "temperature" not in seen[0]["generationConfig"]
+
+
+def test_an_exhausted_quota_is_not_retried(serve) -> None:
+    """A 429 for an empty balance will not clear during a backoff."""
+    attempts: list[int] = []
+
+    def handler(path: str, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+        attempts.append(1)
+        return 429, {
+            "error": {
+                "message": "You have no credits remaining. Add credits to continue.",
+                "code": "credit_balance_exhausted",
+            }
+        }
+
+    with serve(handler) as server, pytest.raises(ProviderError, match="429"):
+        _run(build_provider(spec("openai", server.base_url, max_retries=3)), "s", "u")
+    assert len(attempts) == 1, "an exhausted balance must fail immediately"
+
+
+def test_an_ordinary_rate_limit_is_still_retried(serve, judge_payload) -> None:
+    attempts: list[int] = []
+
+    def handler(path: str, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+        attempts.append(1)
+        if len(attempts) < 2:
+            return 429, {"error": {"message": "rate limit exceeded, please slow down"}}
+        return 200, {"choices": [{"message": {"content": json.dumps(judge_payload)}}]}
+
+    with serve(handler) as server:
+        _run(build_provider(spec("openai", server.base_url, max_retries=3)), "s", "u")
+    assert len(attempts) == 2

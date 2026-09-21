@@ -33,8 +33,11 @@ class ModelConfig(BaseModel):
 
     provider: str
     model: str
-    temperature: float = 0.0
-    max_tokens: int = 4096
+    # Unset by default, and omitted from the request when unset: `temperature`
+    # is deprecated on current Claude models and returns a 400 there. Set it
+    # explicitly for a provider that still accepts it.
+    temperature: float | None = None
+    max_tokens: int = 16000
     timeout: float = 120.0
     max_retries: int = 3
     base_url: str | None = None
