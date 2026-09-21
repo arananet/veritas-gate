@@ -211,3 +211,24 @@ def test_profiles_command_lists_the_bundled_profiles(repo_root: Path) -> None:
     assert result.exit_code == 0
     assert "scientific-paper" in result.stdout
     assert "generic-document" in result.stdout
+
+
+def test_an_unreachable_provider_never_reports_a_pass(tmp_path: Path, repo_root) -> None:
+    """Regression, end to end: bad credentials produced `Gate: PASS`, exit 0.
+
+    Every judge errors, so there are no artifact findings. The gate must treat
+    that as an evaluation that did not happen, not as an artifact with no faults.
+    """
+    project = write_project(tmp_path, "http://127.0.0.1:1", repo_root, max_major=0)
+    result = runner.invoke(app, ["evaluate", str(project)])
+
+    assert result.exit_code == 3, result.stdout
+    assert "FAIL" in result.stdout
+    assert "could not complete" in result.stdout
+    assert "not fully evaluated" in result.stdout
+
+    runs = project / ".veritas" / "runs"
+    run_dir = runs / (runs / "latest").read_text().strip()
+    gate = json.loads((run_dir / "gate.json").read_text())
+    assert gate["status"] == "FAIL"
+    assert sorted(gate["judge_errors"]) == ["adversarial", "evidence", "structure"]

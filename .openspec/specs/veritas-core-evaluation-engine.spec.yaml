@@ -29,6 +29,7 @@ acceptance_criteria:
 - "Given artifact content containing embedded instructions aimed at the judge, when a judge prompt is assembled, then the artifact content is wrapped in an untrusted-data envelope and the system prompt forbids following instructions found inside it."
 - "Given a check whose command is not present in `execution.allow`, when checks run, then the command is not executed and the check reports an error result instead."
 - "Given a malformed or non-conforming LLM response, when a judge parses it, then a structured error result is produced rather than an unhandled exception, and the run continues."
+- "Given judges that could not complete (unreachable provider, missing credentials, malformed responses), when the gate is evaluated, then it never reports PASS: the failed judges are named in the gate result and the run is reported as not fully evaluated."
 - "Given a completed run, when `veritas report`, `veritas findings`, `veritas claims` and `veritas gate` are invoked, then each reads the persisted run and returns the recorded data with the documented exit codes (0 pass, 1 warnings, 2 revise, 3 fail)."
 - "Given `veritas evaluate . --judge evidence --runs 3`, when the same judge is run repeatedly, then per-run results are stored and a stability rating is recorded for that judge."
 test_plan:
@@ -37,6 +38,8 @@ test_plan:
 - 'Unit test: MetaJudge deduplication, consensus, disagreement detection, and preservation of critical findings.'
 - 'Unit test: ClaimGraph construction, claim/evidence linking, status resolution and evidence coverage computation.'
 - 'Unit test: configuration loading with ${ENV_VAR} interpolation, profile resolution and missing-secret error reporting.'
+- 'Unit test: a gate evaluated with judge errors fails, names the failed judges, and the behaviour can be disabled explicitly.'
+- 'Integration test: an evaluation against an unreachable provider exits 3 with FAIL rather than 0 with PASS.'
 - 'Unit test: profile discovery resolves the shipped profiles for an artifact whose config lives in a subdirectory, under both an editable and a built install.'
 - 'Unit test: provider payload construction and response parsing for Anthropic, OpenAI and Google against locally served HTTP responses (no network, no API keys).'
 - 'Unit test: command check allow-list enforcement rejects non-allow-listed commands.'

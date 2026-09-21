@@ -164,3 +164,12 @@ def test_unrelated_findings_at_one_location_are_not_merged() -> None:
         source="structure",
     )
     assert len(consolidate([left, right])) == 2
+
+
+async def test_judge_error_findings_are_not_discarded() -> None:
+    """Regression: filtering these out left a fully failed run with zero findings."""
+    from veritas.judges.base import error_result
+
+    review = await MetaJudge().review([error_result("evidence", "401 invalid api key")], [])
+    assert len(review.consolidated) == 1
+    assert "401 invalid api key" in review.consolidated[0].finding.description

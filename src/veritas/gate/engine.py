@@ -18,9 +18,11 @@ def evaluate_gate(
     check_results: list[CheckResult],
     policy: GatePolicy,
     coverage: ClaimCoverage | None = None,
+    judge_errors: list[str] | None = None,
 ) -> GateResult:
     """Apply ``policy`` to the consolidated findings and check results."""
     counts = severity_counts(findings)
+    judge_errors = list(judge_errors or [])
     blocking: list[str] = []
     reasons: list[str] = []
     fail = False
@@ -85,6 +87,15 @@ def evaluate_gate(
             f"{policy.min_evidence_coverage}%."
         )
 
+    # 6. A judge that could not run did not approve anything. Without this, a run
+    # where every judge errored reports zero findings and passes the gate.
+    if judge_errors and policy.fail_on_judge_error:
+        fail = True
+        reasons.append(
+            f"{len(judge_errors)} judge(s) failed to complete "
+            f"({', '.join(judge_errors)}); the artifact was not fully evaluated."
+        )
+
     if fail:
         status = "FAIL"
     elif revise:
@@ -104,5 +115,6 @@ def evaluate_gate(
         info=counts["info"],
         blocking_findings=sorted(dict.fromkeys(blocking)),
         failed_checks=failed_checks,
+        judge_errors=judge_errors,
         reasons=reasons,
     )

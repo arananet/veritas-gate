@@ -99,12 +99,9 @@ class MetaJudge:
     ) -> MetaReview:
         judge_results = list(judge_results)
         check_results = list(check_results)
-        all_findings = [
-            finding
-            for result in judge_results
-            for finding in result.findings
-            if result.status != "error" or finding.severity != "info"
-        ]
+        # Judge-error findings are kept. Discarding them made a run where every
+        # judge failed look like a run with nothing to report.
+        all_findings = [finding for result in judge_results for finding in result.findings]
         all_findings.extend(finding for result in check_results for finding in result.findings)
 
         consolidated = consolidate(all_findings)

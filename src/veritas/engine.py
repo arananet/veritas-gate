@@ -174,7 +174,10 @@ class Engine:
         )
         self.options.progress("meta", "meta review", "ok")
 
-        gate = evaluate_gate(meta.findings, check_results, self.gate_policy(), coverage)
+        judge_errors = [result.judge for result in judge_results if result.status == "error"]
+        gate = evaluate_gate(
+            meta.findings, check_results, self.gate_policy(), coverage, judge_errors
+        )
         self.options.progress("gate", gate.status, "ok" if gate.status == "PASS" else "warn")
 
         manifest = RunManifest(

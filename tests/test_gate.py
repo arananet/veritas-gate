@@ -96,3 +96,31 @@ def test_minor_limit_does_not_escalate_to_revise() -> None:
     result = evaluate_gate(findings, [], GatePolicy(max_minor=2))
     assert result.status == "PASS_WITH_WARNINGS"
     assert any("exceed the limit" in reason for reason in result.reasons)
+
+
+def test_a_run_where_every_judge_failed_can_never_pass() -> None:
+    """Regression: an evaluation that did not happen was reported as PASS.
+
+    With bad credentials every judge errors, produces no artifact findings, and
+    the gate saw an empty list — so it approved a manuscript it never read.
+    """
+    result = evaluate_gate([], [], GatePolicy(), judge_errors=["methodology", "evidence"])
+    assert result.status == "FAIL"
+    assert result.exit_code == 3
+    assert result.judge_errors == ["methodology", "evidence"]
+    assert any("not fully evaluated" in reason for reason in result.reasons)
+
+
+def test_a_single_judge_failure_still_blocks_the_gate() -> None:
+    result = evaluate_gate([], [], GatePolicy(), judge_errors=["citations"])
+    assert result.status == "FAIL"
+
+
+def test_judge_errors_can_be_tolerated_explicitly() -> None:
+    result = evaluate_gate([], [], GatePolicy(fail_on_judge_error=False), judge_errors=["x"])
+    assert result.status == "PASS"
+    assert result.judge_errors == ["x"]
+
+
+def test_no_judge_errors_leaves_the_verdict_untouched() -> None:
+    assert evaluate_gate([], [], GatePolicy(), judge_errors=[]).status == "PASS"

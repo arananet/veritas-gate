@@ -130,6 +130,7 @@ class GateResult(BaseModel):
     info: int = 0
     blocking_findings: list[str] = Field(default_factory=list)
     failed_checks: list[str] = Field(default_factory=list)
+    judge_errors: list[str] = Field(default_factory=list)
     reasons: list[str] = Field(default_factory=list)
 
     @property
