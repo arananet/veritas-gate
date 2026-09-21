@@ -48,7 +48,7 @@ jobs:
       should_run: ${{ steps.gate.outputs.should_run }}
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install yq
         run: |
@@ -122,7 +122,7 @@ jobs:
       proceed: ${{ steps.guard.outputs.proceed }}
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Read cost_guard config
         id: cfg
@@ -179,7 +179,7 @@ jobs:
       sensitive_ok: ${{ steps.sensitive.outputs.sensitive_ok }}
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Verify labeler is a CODEOWNER
         id: check
@@ -289,7 +289,7 @@ jobs:
       ALLOW_SENSITIVE: ${{ needs.authorize.outputs.sensitive_ok }}
     steps:
       - name: Checkout default branch
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
