@@ -39,6 +39,17 @@ class ModelConfig(BaseModel):
     max_retries: int = 3
     base_url: str | None = None
     api_key_env: str | None = None
+    # How this provider's TLS certificate is verified:
+    #   true          — the certificates bundled with Python (the default)
+    #   "truststore"  — the operating system trust store (macOS Keychain,
+    #                   Windows cert store, the system CA set on Linux). Use this
+    #                   behind a corporate proxy that intercepts TLS: the CA is
+    #                   already installed there. Requires the `truststore` extra.
+    #   "/path/ca.pem" — an explicit CA bundle
+    #   false         — no verification at all. Anyone on the network path can
+    #                   read your API key and the artifact you are evaluating.
+    #                   For a local endpoint with a self-signed certificate only.
+    tls_verify: bool | str = True
 
 
 class GatePolicy(BaseModel):

@@ -118,7 +118,7 @@ jobs:
         uses: github/agentic-workflow@v1
         with:
           goal-file: .github/agents/spec-review.md
-          model: openai/gpt-4o-mini
+          model: openai/gpt-5.6-terra
           context: |
             pull_request: ${{ github.event.pull_request.number }}
             base_ref: ${{ github.base_ref }}

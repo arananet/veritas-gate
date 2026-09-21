@@ -525,6 +525,30 @@ Assume an evaluated artifact is hostile. Veritas Gate:
   not leak into a subprocess;
 - reads secrets only from environment variables, never from configuration.
 
+### Behind a TLS-intercepting proxy
+
+If every judge fails with `CERTIFICATE_VERIFY_FAILED ... self-signed certificate
+in certificate chain`, your network intercepts TLS and Python does not know the
+proxy's CA. Trust it, rather than switching verification off:
+
+```bash
+pip install "veritas-gate[tls]"
+```
+
+```yaml
+models:
+  default:
+    provider: anthropic
+    model: ${VERITAS_DEFAULT_MODEL}
+    tls_verify: truststore      # the OS trust store, where your CA already is
+```
+
+`tls_verify` also accepts a path to a CA bundle, and `false` — which exists for
+a local endpoint with a self-signed certificate. Against a provider on the
+internet, `false` exposes your API key and the artifact you are evaluating to
+anyone on the network path, so Veritas prints a warning naming the endpoint
+whenever verification is off.
+
 Report vulnerabilities through [GitHub private vulnerability reporting](https://github.com/arananet/veritas-gate/security/advisories/new).
 See [`SECURITY.md`](SECURITY.md).
 
