@@ -41,6 +41,7 @@ test_plan:
 - 'Unit test: TLS verification defaults to on, accepts a CA bundle path or the system trust store, and prints a warning naming the endpoint when it is disabled.'
 - 'Unit test: TLS values interpolated from the environment arrive as strings and are read as booleans, not as file paths.'
 - 'Unit test: sampling parameters are omitted from a provider request unless explicitly configured, and are sent when they are.'
+- 'Unit test: the OpenAI output-length parameter adapts to whichever field the endpoint accepts, and each compatibility fallback is attempted at most once.'
 - 'Unit test: a 429 reporting an exhausted quota fails immediately, while an ordinary rate limit is still retried.'
 - 'Unit test: a gate evaluated with judge errors fails, names the failed judges, and the behaviour can be disabled explicitly.'
 - 'Integration test: an evaluation against an unreachable provider exits 3 with FAIL rather than 0 with PASS.'
