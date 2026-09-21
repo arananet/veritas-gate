@@ -184,3 +184,6 @@ terraform.rc
 # ─── OpenSpec local state ──────────────────────────────────────────────────
 .openspec/.cache/
 .openspec/local.yaml
+
+# Veritas evaluation output
+.veritas/
