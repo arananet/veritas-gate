@@ -47,7 +47,6 @@ class AnthropicProvider:
         payload: dict[str, Any] = {
             "model": self.spec.model,
             "max_tokens": self.spec.max_tokens,
-            "temperature": self.spec.temperature,
             "system": system_prompt,
             "messages": [{"role": "user", "content": user_prompt}],
             "tools": [
@@ -59,6 +58,8 @@ class AnthropicProvider:
             ],
             "tool_choice": {"type": "tool", "name": TOOL_NAME},
         }
+        if self.spec.temperature is not None:
+            payload["temperature"] = self.spec.temperature
         payload.update(self.spec.extra)
 
         body = await post_json(self.spec, f"{base}/v1/messages", headers=headers, payload=payload)

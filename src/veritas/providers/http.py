@@ -17,6 +17,25 @@ from veritas.providers.base import MissingCredentialsError, ModelSpec, ProviderE
 
 RETRYABLE_STATUS = {408, 409, 425, 429, 500, 502, 503, 504}
 
+# A 429 usually means "slow down", but some are permanent: an exhausted balance
+# or a spent quota will not clear during a backoff, so retrying only delays the
+# error the user needs to see.
+PERMANENT_429_MARKERS = (
+    "insufficient_quota",
+    "credit_balance_exhausted",
+    "billing_hard_limit_reached",
+    "no credits remaining",
+    "exceeded your current quota",
+)
+
+
+def _is_permanent(status: int, body: str) -> bool:
+    if status != 429:
+        return False
+    lowered = body.lower()
+    return any(marker in lowered for marker in PERMANENT_429_MARKERS)
+
+
 _INSECURE_WARNED: set[str] = set()
 
 
@@ -133,7 +152,9 @@ async def post_json(
                         raise ProviderError(f"{spec.provider} returned an unexpected JSON shape")
                     return body
                 detail = response.text[:600]
-                if response.status_code not in RETRYABLE_STATUS:
+                if response.status_code not in RETRYABLE_STATUS or _is_permanent(
+                    response.status_code, detail
+                ):
                     raise ProviderError(
                         f"{spec.provider} request failed ({response.status_code}): {detail}"
                     )
