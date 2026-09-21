@@ -43,10 +43,12 @@ def build_verify(spec: ModelSpec) -> Any:
     if isinstance(verify, str):
         if verify == "truststore":
             return _truststore_context()
-        if verify in ("default", "certifi"):
+        # YAML interpolated from the environment arrives as a string, so the
+        # booleans have to be recognised here too: `tls_verify: ${VERITAS_TLS_VERIFY:-true}`
+        # would otherwise be read as a path to a file named "true".
+        if verify.lower() in ("true", "1", "yes", "on", "default", "certifi"):
             return True
-        if verify in ("false", "no", "off"):
-            # Only reachable from hand-written YAML; treat it as the opt-out.
+        if verify.lower() in ("false", "0", "no", "off"):
             _warn_insecure(spec)
             return False
         path = Path(verify).expanduser()

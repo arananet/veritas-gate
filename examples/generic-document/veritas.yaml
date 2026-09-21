@@ -11,6 +11,7 @@ models:
   default:
     provider: ${VERITAS_DEFAULT_PROVIDER:-anthropic}
     model: ${VERITAS_DEFAULT_MODEL:-claude-opus-5}
+    tls_verify: ${VERITAS_TLS_VERIFY:-true}
 
 gate:
   fail_on:
