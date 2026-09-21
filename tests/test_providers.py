@@ -190,3 +190,76 @@ def _run(provider, system: str, user: str):
     import asyncio
 
     return asyncio.run(provider.generate_structured(system, user, JudgeResponse))
+
+
+# --------------------------------------------------------------------- TLS
+
+
+def test_tls_verification_is_on_by_default() -> None:
+    from veritas.providers.http import build_verify
+
+    assert build_verify(ModelSpec(provider="anthropic", model="m")) is True
+
+
+def test_a_ca_bundle_path_is_passed_through(tmp_path) -> None:
+    """The right fix behind an intercepting proxy: trust its CA, keep checking."""
+    from veritas.providers.http import build_verify
+
+    bundle = tmp_path / "corp-ca.pem"
+    bundle.write_text("-----BEGIN CERTIFICATE-----\n")
+    spec = ModelSpec(provider="anthropic", model="m", tls_verify=str(bundle))
+    assert build_verify(spec) == str(bundle)
+
+
+def test_a_missing_ca_bundle_is_reported_clearly(tmp_path) -> None:
+    from veritas.providers.http import TLSConfigurationError, build_verify
+
+    spec = ModelSpec(provider="anthropic", model="m", tls_verify=str(tmp_path / "absent.pem"))
+    with pytest.raises(TLSConfigurationError, match="does not exist"):
+        build_verify(spec)
+
+
+def test_truststore_uses_the_system_trust_store() -> None:
+    import ssl
+
+    from veritas.providers.http import build_verify
+
+    context = build_verify(ModelSpec(provider="anthropic", model="m", tls_verify="truststore"))
+    assert isinstance(context, ssl.SSLContext)
+
+
+def test_disabling_verification_warns_and_names_the_exposure(capsys) -> None:
+    """Turning verification off must never be quiet."""
+    from veritas.providers import http
+    from veritas.providers.http import build_verify
+
+    http._INSECURE_WARNED.clear()
+    spec = ModelSpec(
+        provider="anthropic", model="m", tls_verify=False, base_url="https://api.anthropic.com"
+    )
+    assert build_verify(spec) is False
+    captured = capsys.readouterr().err
+    assert "verification is disabled" in captured
+    assert "NOT a local endpoint" in captured
+
+
+def test_a_local_endpoint_gets_a_softer_warning(capsys) -> None:
+    from veritas.providers import http
+    from veritas.providers.http import build_verify
+
+    http._INSECURE_WARNED.clear()
+    spec = ModelSpec(
+        provider="openai-compatible",
+        model="m",
+        tls_verify=False,
+        base_url="https://localhost:8443/v1",
+    )
+    build_verify(spec)
+    assert "This is a local endpoint" in capsys.readouterr().err
+
+
+def test_an_unsupported_tls_value_is_rejected() -> None:
+    from veritas.providers.http import TLSConfigurationError, build_verify
+
+    with pytest.raises(TLSConfigurationError, match="unsupported value"):
+        build_verify(ModelSpec(provider="anthropic", model="m", tls_verify=42))  # type: ignore[arg-type]

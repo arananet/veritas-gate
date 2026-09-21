@@ -36,6 +36,7 @@ class ModelSpec:
     max_retries: int = 3
     base_url: str | None = None
     api_key_env: str | None = None
+    tls_verify: bool | str = True
     extra: dict[str, Any] = field(default_factory=dict)
 
 

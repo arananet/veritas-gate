@@ -38,6 +38,7 @@ test_plan:
 - 'Unit test: MetaJudge deduplication, consensus, disagreement detection, and preservation of critical findings.'
 - 'Unit test: ClaimGraph construction, claim/evidence linking, status resolution and evidence coverage computation.'
 - 'Unit test: configuration loading with ${ENV_VAR} interpolation, profile resolution and missing-secret error reporting.'
+- 'Unit test: TLS verification defaults to on, accepts a CA bundle path or the system trust store, and prints a warning naming the endpoint when it is disabled.'
 - 'Unit test: a gate evaluated with judge errors fails, names the failed judges, and the behaviour can be disabled explicitly.'
 - 'Integration test: an evaluation against an unreachable provider exits 3 with FAIL rather than 0 with PASS.'
 - 'Unit test: profile discovery resolves the shipped profiles for an artifact whose config lives in a subdirectory, under both an editable and a built install.'

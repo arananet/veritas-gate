@@ -57,6 +57,10 @@ Guidelines:
     `repair-plan`, `profiles`) with CI-meaningful exit codes.
   - Prompt-injection containment: artifact content is wrapped as untrusted data, finding ids
     are assigned by Veritas, and nothing executes unless listed in `execution.allow`.
+- Per-model `tls_verify`, for networks that intercept TLS: `truststore` uses the operating
+  system trust store (new `[tls]` extra), a path uses an explicit CA bundle, and `false`
+  disables verification for a local self-signed endpoint — printing a warning that names
+  the endpoint and what it exposes (spec: veritas-core-evaluation-engine).
 - Shared local/CI Markdown lint runner with locked dependencies, `make setup-lint`, `make lint-markdown`, and `make verify-template` (spec: lean-agent-workflow).
 - Persistent verification evidence, stale-state detection, pause/resume and optional bounded local agent adapters (spec: reliable-verification-and-resumable-execution).
 

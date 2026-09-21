@@ -94,6 +94,7 @@ class Engine:
                 max_retries=model.max_retries,
                 base_url=model.base_url,
                 api_key_env=model.api_key_env,
+                tls_verify=model.tls_verify,
                 extra=model.model_extra or {},
             )
             self._providers[role] = self.options.provider_factory(spec)
