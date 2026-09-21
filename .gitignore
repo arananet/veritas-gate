@@ -185,6 +185,5 @@ terraform.rc
 .openspec/.cache/
 .openspec/local.yaml
 
-# Veritas Gate
-.venv/
-.veritas/runs/
+# Veritas evaluation output
+.veritas/
