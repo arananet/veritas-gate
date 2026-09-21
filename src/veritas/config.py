@@ -54,6 +54,9 @@ class GatePolicy(BaseModel):
     require_checks: list[str] = Field(default_factory=list)
     min_evidence_coverage: float | None = None
     warn_on_minor: bool = True
+    # A judge that could not run did not approve anything. An evaluation that
+    # failed to happen must never be reported as a pass.
+    fail_on_judge_error: bool = True
 
 
 class CheckConfig(BaseModel):

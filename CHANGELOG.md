@@ -62,6 +62,12 @@ Guidelines:
 
 ### Fixed
 
+- **The gate could report `PASS` for an artifact it never evaluated.** When every judge
+  failed — unreachable provider, missing or invalid credentials — the meta review
+  discarded their error results, the gate saw zero findings and approved the artifact
+  with exit code 0. Judge errors are now retained as findings, the gate refuses to pass
+  while any judge failed to complete (`gate.fail_on_judge_error`, on by default), and the
+  console names each failed judge and its reason (spec: veritas-core-evaluation-engine).
 - Profile discovery found nothing for an artifact whose config lives in a subdirectory
   (`veritas evaluate examples/paper`) under an editable install, because the packaged
   profile copy only exists in a built wheel. A source-checkout fallback now resolves the

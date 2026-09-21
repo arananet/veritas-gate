@@ -76,10 +76,27 @@ class ConsoleReporter:
             self.console.print(result.gate.status)
             return
         self.console.print()
+        self._judge_errors(result)
         self._claims(result)
         self._findings_table(result.gate)
         self._blocking(result)
         self._gate(result.gate)
+
+    def _judge_errors(self, result: EvaluationResult) -> None:
+        """Say why a judge failed. A silent ✗ hid broken credentials as a pass."""
+        failed = [item for item in result.judge_results if item.status == "error"]
+        if not failed:
+            return
+        self.console.print(f"[bold red]{len(failed)} judge(s) could not complete:[/bold red]")
+        for item in failed:
+            self.console.print(f"  [red]✗[/red] {item.judge}")
+            if item.summary:
+                self.console.print(f"    [dim]{item.summary}[/dim]")
+        self.console.print()
+        self.console.print(
+            "[yellow]The artifact was not fully evaluated, so the gate cannot pass.[/yellow]"
+        )
+        self.console.print()
 
     def _claims(self, result: EvaluationResult) -> None:
         coverage = result.coverage
