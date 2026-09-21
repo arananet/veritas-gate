@@ -65,6 +65,9 @@ eval_plan:
   metrics:
   - Evidence coverage percentage reported for the claim graph.
 technical_notes: |
+  Model ids are configuration, never code: the shipped examples name current ids
+  as documentation, and tests must not depend on those literals.
+
   Python 3.12+, Typer, Pydantic v2, httpx, PyYAML, Rich. asyncio orchestration
   implemented directly; no agent framework. Secrets come only from environment
   variables (.env.example documents them). Judges are blind in phase one: they

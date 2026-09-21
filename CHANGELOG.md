@@ -57,6 +57,9 @@ Guidelines:
     `repair-plan`, `profiles`) with CI-meaningful exit codes.
   - Prompt-injection containment: artifact content is wrapped as untrusted data, finding ids
     are assigned by Veritas, and nothing executes unless listed in `execution.allow`.
+- Current model ids in the shipped examples and `.env.example`: `claude-sonnet-5`,
+  `gpt-5.4-luna`, `gemini-3.57-pro`. The example-paper test no longer names the default
+  ids, so bumping a model cannot break it (spec: veritas-core-evaluation-engine).
 - Per-model `tls_verify`, for networks that intercept TLS: `truststore` uses the operating
   system trust store (new `[tls]` extra), a path uses an explicit CA bundle, and `false`
   disables verification for a local self-signed endpoint — printing a warning that names

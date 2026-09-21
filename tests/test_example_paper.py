@@ -8,6 +8,7 @@ those into a non-PASS gate with the right blocking findings and reports.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 from pathlib import Path
 from typing import Any
@@ -242,16 +243,16 @@ def example_project(tmp_path: Path, repo_root: Path, serve) -> Any:
     project = tmp_path / "paper"
     shutil.copytree(repo_root / "examples" / "paper", project)
     with serve(handler) as server:
+        # Point every provider and model at the local endpoint without naming
+        # the shipped defaults: bumping a model id must not break this test.
+        config = re.sub(
+            r"\$\{VERITAS_\w*PROVIDER:-[^}]*\}",
+            "openai",
+            (project / "veritas.yaml").read_text(),
+        )
+        config = re.sub(r"\$\{VERITAS_\w*MODEL:-[^}]*\}", "test-model", config)
         (project / "veritas.yaml").write_text(
-            (project / "veritas.yaml")
-            .read_text()
-            .replace("${VERITAS_DEFAULT_PROVIDER:-anthropic}", "openai")
-            .replace("${VERITAS_DEFAULT_MODEL:-claude-sonnet-4-5}", "test-model")
-            .replace("${VERITAS_ADVERSARIAL_PROVIDER:-openai}", "openai")
-            .replace("${VERITAS_ADVERSARIAL_MODEL:-gpt-4.1}", "test-model")
-            .replace("${VERITAS_META_PROVIDER:-google}", "openai")
-            .replace("${VERITAS_META_MODEL:-gemini-2.5-pro}", "test-model")
-            + f"\nprofile_paths:\n  - {repo_root / 'profiles'}\n"
+            config + f"\nprofile_paths:\n  - {repo_root / 'profiles'}\n"
         )
         # Route every role at the local endpoint.
         text = (
