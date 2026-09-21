@@ -66,7 +66,11 @@ eval_plan:
   - Evidence coverage percentage reported for the claim graph.
 technical_notes: |
   Model ids are configuration, never code: the shipped examples name current ids
-  as documentation, and tests must not depend on those literals.
+  as documentation, and tests must not depend on those literals. The OpenSpec
+  template's own agents (spec review, issue auto-fix) carry GitHub Models
+  catalog ids, which are a different namespace from the provider ids Veritas
+  uses; both agents ship disabled, so those ids need checking against the
+  catalog before either is enabled.
 
   Python 3.12+, Typer, Pydantic v2, httpx, PyYAML, Rich. asyncio orchestration
   implemented directly; no agent framework. Secrets come only from environment

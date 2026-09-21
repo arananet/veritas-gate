@@ -64,7 +64,7 @@ ci:
 agents:
   spec_review:
     enabled: false
-    model: "openai/gpt-4o-mini"
+    model: "openai/gpt-5.6-luna"
     trigger: "pull_request"
     post_as: "pr-comment"
     goal_file: ".github/agents/spec-review.md"
@@ -85,7 +85,7 @@ agents:
   issue_autofix:
     enabled: false
     label: "agent:autofix"
-    model: "anthropic/claude-sonnet-4-6"
+    model: "anthropic/claude-opus-4-7"
     goal_file: ".github/agents/issue-autofix.md"
     # Hard caps on the agent's branch — exceeding either aborts the run.
     max_changed_files: 20
