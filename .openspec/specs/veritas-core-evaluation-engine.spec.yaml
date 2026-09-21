@@ -1,0 +1,65 @@
+---
+title: Veritas Gate core evaluation engine
+slug: veritas-core-evaluation-engine
+type: feature
+status: review
+author: Claude
+created_at: '2026-09-21'
+updated_at: '2026-09-21'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  Veritas Gate evaluates artifacts (papers, repositories, documents, designs)
+  independently of whatever generated them. This spec covers the v0.1 core:
+  domain models (Artifact, Finding, JudgeResult, CheckResult, EvaluationResult,
+  Claim/ClaimGraph), profile-driven configuration, LLM provider adapters for
+  Anthropic, OpenAI and Google, blind independent LLM judges, deterministic
+  allow-listed checks, a claim graph with evidence coverage, a MetaJudge that
+  preserves critical findings instead of averaging them, a deterministic gate
+  engine, immutable run directories under .veritas/runs/, Markdown + JSON
+  reports, a repair plan, and the `veritas` CLI with CI-meaningful exit codes.
+  Evaluation never modifies the artifact it judges.
+acceptance_criteria:
+- "Given a profile YAML and an artifact path, when `veritas evaluate <path>` runs, then judges and checks execute, a claim graph is built, the MetaJudge consolidates findings, the gate is evaluated, and reports are written to an immutable run directory under `.veritas/runs/<timestamp>/`."
+- "Given a gate policy with `fail_on: [critical]` and `max_major: 0`, when any critical finding exists, then the gate status is FAIL and the CLI exit code is 3; when only major findings exceed the limit, the status is REVISE and the exit code is 2."
+- "Given several judges that report overlapping findings, when the MetaJudge consolidates them, then duplicates are grouped into one consolidated finding whose severity is the maximum reported severity, and no critical or major finding is dropped or averaged away."
+- "Given artifact content containing embedded instructions aimed at the judge, when a judge prompt is assembled, then the artifact content is wrapped in an untrusted-data envelope and the system prompt forbids following instructions found inside it."
+- "Given a check whose command is not present in `execution.allow`, when checks run, then the command is not executed and the check reports an error result instead."
+- "Given a malformed or non-conforming LLM response, when a judge parses it, then a structured error result is produced rather than an unhandled exception, and the run continues."
+- "Given a completed run, when `veritas report`, `veritas findings`, `veritas claims` and `veritas gate` are invoked, then each reads the persisted run and returns the recorded data with the documented exit codes (0 pass, 1 warnings, 2 revise, 3 fail)."
+- "Given `veritas evaluate . --judge evidence --runs 3`, when the same judge is run repeatedly, then per-run results are stored and a stability rating is recorded for that judge."
+test_plan:
+- 'Unit test: gate engine policy evaluation across PASS / PASS_WITH_WARNINGS / REVISE / FAIL including required-check failures and blocking finding ids.'
+- 'Unit test: Finding and JudgeResult schema validation, including rejection of invalid severities and confidence bounds, and evidence-free findings receiving reduced confidence.'
+- 'Unit test: MetaJudge deduplication, consensus, disagreement detection, and preservation of critical findings.'
+- 'Unit test: ClaimGraph construction, claim/evidence linking, status resolution and evidence coverage computation.'
+- 'Unit test: configuration loading with ${ENV_VAR} interpolation, profile resolution and missing-secret error reporting.'
+- 'Unit test: provider payload construction and response parsing for Anthropic, OpenAI and Google against locally served HTTP responses (no network, no API keys).'
+- 'Unit test: command check allow-list enforcement rejects non-allow-listed commands.'
+- 'Integration test: full pipeline over `examples/generic-document` using a locally served provider endpoint, asserting run directory contents, report files and CLI exit codes.'
+qa_notes: |
+  Live-provider integration tests are opt-in and skipped unless the matching
+  API key environment variables are set. The default test suite must pass
+  offline with no API keys configured.
+out_of_scope:
+- Automatic artifact repair (`veritas repair`); v0.1 only emits repair-plan.json.
+- Web UI or hosted service.
+- Profiles other than scientific-paper and a generic document profile.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - Deliberately flawed example paper produces a non-PASS gate with blocking findings.
+  metrics:
+  - Evidence coverage percentage reported for the claim graph.
+technical_notes: |
+  Python 3.12+, Typer, Pydantic v2, httpx, PyYAML, Rich. asyncio orchestration
+  implemented directly; no agent framework. Secrets come only from environment
+  variables (.env.example documents them). Judges are blind in phase one: they
+  never receive other judges' results, generator prompts, or prior repair
+  attempts. Only the MetaJudge sees multiple judge results. The gate decision is
+  deterministic Python, never an LLM call.
+linked_issues: []
+linked_prs: []

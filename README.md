@@ -1,8 +1,8 @@
-# {{PROJECT_NAME}}
+# veritas-gate
 
 {{BADGES}}
 
-> {{PROJECT_DESCRIPTION}}
+> Extensible multi-agent evaluation and quality-gate framework for papers, codebases, architectures, and AI-generated artifacts.
 
 ---
 
@@ -31,12 +31,12 @@ after onboarding.
 
 ```bash
 # 1. Clone and install
-git clone https://github.com/{{GITHUB_OWNER}}/{{PROJECT_NAME}}.git
-cd {{PROJECT_NAME}}
+git clone https://github.com/arananet/veritas-gate.git
+cd veritas-gate
 bash setup.sh
 
 # 2. Run
-{{TEST_COMMAND}}
+pytest
 ```
 
 <!--

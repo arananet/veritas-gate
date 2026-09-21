@@ -1,5 +1,5 @@
 {
-  "name": "{{PROJECT_NAME}}",
+  "name": "veritas-gate",
   "image": "mcr.microsoft.com/devcontainers/universal:2",
 
   // Runs once when the Codespace or Dev Container is first created.

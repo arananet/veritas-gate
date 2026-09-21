@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `{{PROJECT_NAME}}` will be documented in this file.
+All notable changes to `veritas-gate` will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -71,4 +71,4 @@ Commits: `0a92a2d`, `035a861`, `5adbfbe`.
 
 - Initial repository commit (`d07225a`). No tagged release date is recorded in the local Git history.
 
-[Unreleased]: https://github.com/{{GITHUB_OWNER}}/{{PROJECT_NAME}}/commits/HEAD
+[Unreleased]: https://github.com/arananet/veritas-gate/commits/HEAD
