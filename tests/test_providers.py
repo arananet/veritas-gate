@@ -263,3 +263,23 @@ def test_an_unsupported_tls_value_is_rejected() -> None:
 
     with pytest.raises(TLSConfigurationError, match="unsupported value"):
         build_verify(ModelSpec(provider="anthropic", model="m", tls_verify=42))  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("value", ["true", "True", "1", "yes", "on", "default"])
+def test_string_booleans_from_env_interpolation_enable_verification(value: str) -> None:
+    """Regression: `tls_verify: ${VAR:-true}` was read as a path named "true"."""
+    from veritas.providers.http import build_verify
+
+    assert build_verify(ModelSpec(provider="anthropic", model="m", tls_verify=value)) is True
+
+
+@pytest.mark.parametrize("value", ["false", "False", "0", "no", "off"])
+def test_string_booleans_from_env_interpolation_can_disable_verification(
+    value: str, capsys
+) -> None:
+    from veritas.providers import http
+    from veritas.providers.http import build_verify
+
+    http._INSECURE_WARNED.clear()
+    assert build_verify(ModelSpec(provider="anthropic", model="m", tls_verify=value)) is False
+    assert "verification is disabled" in capsys.readouterr().err

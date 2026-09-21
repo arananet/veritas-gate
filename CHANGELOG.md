@@ -61,6 +61,11 @@ Guidelines:
   `gpt-5.6-terra`, `gemini-3.1-pro`. The OpenSpec template's own spec-review and
   issue-autofix agents were moved off their stale ids too. The example-paper test no longer names the default
   ids, so bumping a model cannot break it (spec: veritas-core-evaluation-engine).
+- `VERITAS_TLS_VERIFY` is read by the shipped example configs, so TLS behaviour is set
+  once in `.env` rather than by editing YAML. String values interpolated from the
+  environment (`true`, `false`, `truststore`, a path) are all accepted — previously
+  `tls_verify: ${VAR:-true}` was read as a path to a file named `true`
+  (spec: veritas-core-evaluation-engine).
 - Per-model `tls_verify`, for networks that intercept TLS: `truststore` uses the operating
   system trust store (new `[tls]` extra), a path uses an explicit CA bundle, and `false`
   disables verification for a local self-signed endpoint — printing a warning that names
