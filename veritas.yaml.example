@@ -1,0 +1,55 @@
+version: 1
+
+profile: scientific-paper
+
+artifact:
+  type: document
+  paths:
+    - paper
+    - experiments
+    - results
+    - scripts
+
+# Model ids come from the environment so no vendor name is hard-coded here.
+# Copy .env.example at the repository root and export the values.
+models:
+  default:
+    provider: ${VERITAS_DEFAULT_PROVIDER:-anthropic}
+    model: ${VERITAS_DEFAULT_MODEL:-claude-sonnet-4-5}
+  adversarial:
+    provider: ${VERITAS_ADVERSARIAL_PROVIDER:-openai}
+    model: ${VERITAS_ADVERSARIAL_MODEL:-gpt-4.1}
+  meta:
+    provider: ${VERITAS_META_PROVIDER:-google}
+    model: ${VERITAS_META_MODEL:-gemini-2.5-pro}
+
+gate:
+  fail_on:
+    - critical
+  max_major: 0
+  max_minor: 20
+
+checks:
+  repository-structure:
+    type: required-paths
+    enabled: true
+    severity_on_failure: minor
+    required_paths:
+      - paper/main.md
+      - results/benchmark.json
+
+  required-sections:
+    type: required-sections
+    enabled: true
+    target: paper/main.md
+    severity_on_failure: major
+    required_sections:
+      - abstract
+      - introduction
+      - method
+      - results
+      - conclusion
+
+# Nothing runs unless it is listed here.
+execution:
+  allow: []

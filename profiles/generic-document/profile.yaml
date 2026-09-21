@@ -1,0 +1,46 @@
+# Generic document profile.
+#
+# The smallest useful profile, and a worked example of the plugin contract:
+# a profile is a directory with profile.yaml and prompts/, nothing more.
+profile: generic-document
+version: "1"
+description: Domain-neutral evaluation of a written document and its claims.
+artifact_type: document
+default_paths:
+  - .
+
+meta_model_role: meta
+
+judges:
+  - name: structure
+    prompt: structure.md
+    model_role: structure
+    version: "1"
+    description: Completeness, clarity, internal consistency and audience fit.
+
+  - name: evidence
+    prompt: evidence.md
+    model_role: evidence
+    version: "1"
+    extracts_claims: true
+    description: Extracts the document's claims and rates how well each is supported.
+
+  - name: adversarial
+    prompt: adversarial.md
+    model_role: adversarial
+    version: "1"
+    description: Looks for the reasons a demanding reader would reject the document.
+
+checks:
+  required-sections:
+    type: required-sections
+    enabled: false
+    severity_on_failure: minor
+    required_sections: []
+
+gate:
+  fail_on:
+    - critical
+  max_major: 2
+  max_minor: null
+  warn_on_minor: true

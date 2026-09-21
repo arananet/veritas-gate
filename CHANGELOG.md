@@ -23,6 +23,20 @@ Guidelines:
 
 ### Added
 
+- Veritas Gate v0.1: the core evaluation framework (spec: veritas-core-evaluation-engine).
+  - Domain models: `Artifact`, `Finding`, `JudgeResult`, `CheckResult`, `Claim`, `EvaluationResult`.
+  - Profiles as plugins: `scientific-paper` and `generic-document`, discovered from config,
+    the project tree, `VERITAS_PROFILE_PATH`, the package, and `veritas.profiles` entry points.
+  - Provider adapters for Anthropic, OpenAI, OpenAI-compatible endpoints and Google, with
+    structured output, retries, timeouts and token-usage metadata.
+  - Blind independent LLM judges, deterministic allow-listed checks, a claim graph with
+    evidence coverage, a MetaJudge that preserves critical findings, and a deterministic gate.
+  - Immutable runs under `.veritas/runs/`, Markdown and JSON reports, and an advisory
+    `repair-plan.json`.
+  - The `veritas` CLI (`init`, `evaluate`, `report`, `findings`, `claims`, `gate`,
+    `repair-plan`, `profiles`) with CI-meaningful exit codes.
+  - Prompt-injection containment: artifact content is wrapped as untrusted data, finding ids
+    are assigned by Veritas, and nothing executes unless listed in `execution.allow`.
 - Shared local/CI Markdown lint runner with locked dependencies, `make setup-lint`, `make lint-markdown`, and `make verify-template` (spec: lean-agent-workflow).
 - Persistent verification evidence, stale-state detection, pause/resume and optional bounded local agent adapters (spec: reliable-verification-and-resumable-execution).
 

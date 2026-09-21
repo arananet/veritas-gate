@@ -184,3 +184,7 @@ terraform.rc
 # ─── OpenSpec local state ──────────────────────────────────────────────────
 .openspec/.cache/
 .openspec/local.yaml
+
+# Veritas Gate
+.venv/
+.veritas/runs/

@@ -44,6 +44,11 @@ qa_notes: |
   Live-provider integration tests are opt-in and skipped unless the matching
   API key environment variables are set. The default test suite must pass
   offline with no API keys configured.
+
+  Implementation evidence: provider adapters are exercised against a local HTTP
+  server rather than a patched client, so the request payloads and response
+  parsing under test are the ones that would go over the wire. The full suite
+  runs with no API keys and no network access.
 out_of_scope:
 - Automatic artifact repair (`veritas repair`); v0.1 only emits repair-plan.json.
 - Web UI or hosted service.
