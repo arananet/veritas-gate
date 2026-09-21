@@ -110,3 +110,28 @@ def test_missing_prompt_file_is_reported_clearly(tmp_path: Path) -> None:
     profile = load_profile("broken", tmp_path)
     with pytest.raises(ConfigError, match=r"prompt 'ghost\.md' is missing"):
         profile.prompt_for(profile.definition.judges[0])
+
+
+def test_profiles_resolve_from_a_subdirectory_config(repo_root: Path) -> None:
+    """Regression: `veritas evaluate examples/paper` found no profiles at all.
+
+    The artifact's config lives in a subdirectory, so the search root is that
+    subdirectory, not the repository. The packaged copy does not exist under an
+    editable install, which left nothing to fall back to.
+    """
+    catalog = available_profiles(repo_root / "examples" / "paper")
+    assert "scientific-paper" in catalog
+    assert "generic-document" in catalog
+
+
+def test_the_example_projects_resolve_their_own_profile(repo_root: Path) -> None:
+    """Every shipped example must work straight from a clone, unmodified."""
+    for example, expected in (
+        ("paper", "scientific-paper"),
+        ("generic-document", "generic-document"),
+    ):
+        root = repo_root / "examples" / example
+        config = load_config(root / "veritas.yaml")
+        profile = load_profile(config.profile, config.root, config.profile_paths)
+        assert profile.name == expected
+        assert profile.definition.judges

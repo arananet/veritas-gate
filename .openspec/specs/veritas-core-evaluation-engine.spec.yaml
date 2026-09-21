@@ -37,6 +37,7 @@ test_plan:
 - 'Unit test: MetaJudge deduplication, consensus, disagreement detection, and preservation of critical findings.'
 - 'Unit test: ClaimGraph construction, claim/evidence linking, status resolution and evidence coverage computation.'
 - 'Unit test: configuration loading with ${ENV_VAR} interpolation, profile resolution and missing-secret error reporting.'
+- 'Unit test: profile discovery resolves the shipped profiles for an artifact whose config lives in a subdirectory, under both an editable and a built install.'
 - 'Unit test: provider payload construction and response parsing for Anthropic, OpenAI and Google against locally served HTTP responses (no network, no API keys).'
 - 'Unit test: command check allow-list enforcement rejects non-allow-listed commands.'
 - 'Integration test: full pipeline over `examples/generic-document` using a locally served provider endpoint, asserting run directory contents, report files and CLI exit codes.'

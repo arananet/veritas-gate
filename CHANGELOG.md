@@ -62,6 +62,10 @@ Guidelines:
 
 ### Fixed
 
+- Profile discovery found nothing for an artifact whose config lives in a subdirectory
+  (`veritas evaluate examples/paper`) under an editable install, because the packaged
+  profile copy only exists in a built wheel. A source-checkout fallback now resolves the
+  repository's own `profiles/` (spec: veritas-core-evaluation-engine).
 - Artifact and workspace file discovery matched the skip list against absolute path parts,
   so an artifact rooted under a skipped directory name (such as a repair workspace under
   `.veritas/workspaces/`) appeared empty to judges and checks (spec: bounded-repair-loop).

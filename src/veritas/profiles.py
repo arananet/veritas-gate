@@ -10,7 +10,8 @@ Resolution order:
 1. ``--profile-path`` / ``profile_paths:`` entries from configuration
 2. ``<project>/profiles/<name>``
 3. ``$VERITAS_PROFILE_PATH`` (os.pathsep-separated)
-4. profiles bundled with the installed package
+4. profiles bundled with the installed package, or the repository's own
+   ``profiles/`` when running from a source checkout
 5. ``veritas.profiles`` entry points published by third-party packages
 """
 
@@ -108,9 +109,9 @@ def search_paths(root: Path, extra: list[str] | None = None) -> list[Path]:
     for entry in os.environ.get(ENV_PATH_VAR, "").split(os.pathsep):
         if entry.strip():
             paths.append(Path(entry.strip()))
-    bundled = _bundled_profiles_dir()
-    if bundled is not None:
-        paths.append(bundled)
+    for discovered in (_bundled_profiles_dir(), _source_profiles_dir()):
+        if discovered is not None and discovered not in paths:
+            paths.append(discovered)
     return paths
 
 
@@ -161,12 +162,27 @@ def load_profile_dir(directory: Path) -> Profile:
 
 
 def _bundled_profiles_dir() -> Path | None:
+    """The profiles shipped with the installed package, if they are present."""
     try:
         resource = resources.files("veritas") / "_bundled_profiles"
     except (ModuleNotFoundError, AttributeError):  # pragma: no cover - defensive
         return None
     path = Path(str(resource))
     return path if path.is_dir() else None
+
+
+def _source_profiles_dir() -> Path | None:
+    """The repository's own ``profiles/`` when running from a source checkout.
+
+    An editable install (``pip install -e .``) does not materialise the bundled
+    copy, so without this an artifact whose config lives in a subdirectory —
+    ``examples/paper``, say — finds no profiles at all.
+    """
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / "profiles"
+        if (candidate / "generic-document" / "profile.yaml").is_file():
+            return candidate
+    return None
 
 
 def _entry_point_profiles() -> dict[str, Path]:
