@@ -18,7 +18,7 @@ models:
     model: ${VERITAS_DEFAULT_MODEL:-claude-opus-4-7}
   adversarial:
     provider: ${VERITAS_ADVERSARIAL_PROVIDER:-openai}
-    model: ${VERITAS_ADVERSARIAL_MODEL:-gpt-5.6-luna}
+    model: ${VERITAS_ADVERSARIAL_MODEL:-gpt-5.6-terra}
   meta:
     provider: ${VERITAS_META_PROVIDER:-google}
     model: ${VERITAS_META_MODEL:-gemini-3.1-pro}

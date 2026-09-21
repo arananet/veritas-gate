@@ -64,7 +64,7 @@ ci:
 agents:
   spec_review:
     enabled: false
-    model: "openai/gpt-5.6-luna"
+    model: "openai/gpt-5.6-terra"
     trigger: "pull_request"
     post_as: "pr-comment"
     goal_file: ".github/agents/spec-review.md"

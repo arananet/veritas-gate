@@ -58,7 +58,7 @@ Guidelines:
   - Prompt-injection containment: artifact content is wrapped as untrusted data, finding ids
     are assigned by Veritas, and nothing executes unless listed in `execution.allow`.
 - Current model ids in the shipped examples and `.env.example`: `claude-opus-4-7`,
-  `gpt-5.6-luna`, `gemini-3.1-pro`. The OpenSpec template's own spec-review and
+  `gpt-5.6-terra`, `gemini-3.1-pro`. The OpenSpec template's own spec-review and
   issue-autofix agents were moved off their stale ids too. The example-paper test no longer names the default
   ids, so bumping a model cannot break it (spec: veritas-core-evaluation-engine).
 - Per-model `tls_verify`, for networks that intercept TLS: `truststore` uses the operating
