@@ -1,0 +1,27 @@
+{
+  "name": "{{PROJECT_NAME}}",
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+
+  // Runs once when the Codespace or Dev Container is first created.
+  // Installs git hooks and makes scripts/openspec executable.
+  // No external dependencies — bash + coreutils + git only.
+  "postCreateCommand": "bash setup.sh",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "GitHub.copilot",
+        "GitHub.copilot-chat"
+      ],
+      "settings": {
+        "github.copilot.chat.codeGeneration.instructions": [
+          { "file": ".github/copilot-instructions.md" }
+        ]
+      }
+    }
+  },
+
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  }
+}

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+export OPENSPEC_ROOT="$ROOT"
+exec bash "$ROOT/scripts/openspec" hook pre_commit

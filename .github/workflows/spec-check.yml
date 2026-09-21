@@ -1,0 +1,78 @@
+name: OpenSpec PR Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions: read-all
+
+concurrency:
+  group: spec-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  spec-check:
+    name: Validate Spec Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0 # required for git diff against base branch
+
+      - name: Validate using the shared CLI
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          TEMPLATE_REPOSITORY: ${{ vars.OPENSPEC_TEMPLATE }}
+        run: |
+          args=(check --ci)
+          template_ref="${BASE_SHA:-HEAD}"
+          if [[ -f .openspec/template ]] && { [[ "$TEMPLATE_REPOSITORY" == true ]] || git cat-file -e "$template_ref:.openspec/template" 2>/dev/null; }; then
+            args+=(--template)
+          fi
+          if [[ -n "$BASE_SHA" ]]; then args+=(--base "$BASE_SHA"); fi
+          bash scripts/openspec "${args[@]}"
+
+  run-tests:
+    name: Run Tests
+    needs: spec-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Verify with the shared CLI
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          TEMPLATE_REPOSITORY: ${{ vars.OPENSPEC_TEMPLATE }}
+        run: |
+          template_ref="${BASE_SHA:-HEAD}"
+          if [[ -f .openspec/template ]] && { [[ "$TEMPLATE_REPOSITORY" == true ]] || git cat-file -e "$template_ref:.openspec/template" 2>/dev/null; }; then
+            make test-template
+          else
+            args=(ci-tests)
+            if [[ -n "$BASE_SHA" ]]; then args+=(--base "$BASE_SHA"); fi
+            bash scripts/openspec "${args[@]}"
+          fi
+
+      - name: Retain verification reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: openspec-verification
+          path: .openspec/runs/*/verify-*.json
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+command -v ruby >/dev/null 2>&1 || { printf 'OpenSpec requires Ruby >= 2.6 (standard libraries only).\n' >&2; exit 2; }
+exec ruby "$SCRIPT_DIR/openspec_core.rb" "$@"
