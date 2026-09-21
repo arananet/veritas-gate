@@ -156,8 +156,18 @@ def test_reporting_commands_read_the_persisted_run(
     assert gate.exit_code == 2
     assert gate.stdout.strip() == "REVISE"
 
-    plan = runner.invoke(app, ["repair-plan", str(project)])
-    assert plan.exit_code == 0
+    # The run directory keeps its own advisory plan...
+    run_dir = (
+        project
+        / ".veritas"
+        / "runs"
+        / (project / ".veritas" / "runs" / "latest").read_text().strip()
+    )
+    assert json.loads((run_dir / "repair-plan.json").read_text())["actions"]
+
+    # ...and assist mode plans from that stored run without re-evaluating.
+    plan = runner.invoke(app, ["repair-plan", str(project), "--no-evaluate", "--json"])
+    assert plan.exit_code == 0, plan.stdout
     assert json.loads(plan.stdout)["actions"]
 
 

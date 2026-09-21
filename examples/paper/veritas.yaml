@@ -53,3 +53,34 @@ checks:
 # Nothing runs unless it is listed here.
 execution:
   allow: []
+
+# ─── Autopilot ───────────────────────────────────────────────────────────────
+# `veritas loop examples/paper` repairs in an isolated workspace, never here.
+workspace:
+  mode: snapshot
+
+loop:
+  enabled: true
+  max_iterations: 5
+  consecutive_non_improving_iterations: 2
+  same_blocker_repeated: 2
+
+repair:
+  mode: autopilot
+  agent:
+    provider: generic-cli
+    command:
+      - codex
+      - exec
+      - "{prompt_file}"
+  permissions:
+    documentation: true
+    source_code: true
+    tests: true
+    # This example paper's headline defect needs a real experiment, so the loop
+    # is expected to stop with HUMAN_DECISION_REQUIRED. That is the correct
+    # outcome, not a failure.
+    experiments: false
+    datasets: false
+    scientific_claims: false
+    methodology: false

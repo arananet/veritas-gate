@@ -111,6 +111,217 @@ Blocking findings:
 
 ---
 
+## The separation is the design
+
+This is the part that is not negotiable: **the evaluator, the repairer and the
+orchestrator are three different systems.**
+
+Codex — or Claude Code, or any CLI agent — may repair the artifact. It does not
+get to decide whether its own repair was correct. Veritas re-evaluates the
+result from scratch, and the orchestrator decides whether to continue or stop.
+
+```mermaid
+flowchart TD
+    subgraph VERITAS["Veritas"]
+        EE["Evaluation Engine<br/><i>what is wrong?</i>"]
+        RP["Repair Planner<br/><i>what must change?</i>"]
+        LO["Loop Orchestrator<br/><i>are we allowed to? do we continue?</i>"]
+        GE["Gate Engine<br/><i>pass or fail, deterministically</i>"]
+        FL["Finding Ledger<br/><i>is this the same issue as before?</i>"]
+    end
+
+    RA["Repair Agent<br/><i>the bridge</i>"]
+    EXT["External agent<br/>Codex · Claude Code · a human"]
+    ART["Artifact"]
+
+    ART --> EE
+    EE -->|structured findings| RP
+    RP -->|RepairPlan| LO
+    LO -->|permissions checked| RA
+    RA -->|normalized contract| EXT
+    EXT -->|edits files| ART
+    RA -->|RepairResult| LO
+    EE --> GE
+    GE --> LO
+    EE --> FL
+    FL --> LO
+    LO -->|re-evaluate from scratch| EE
+    LO -->|PASS · no progress · human needed| STOP(["STOP<br/>with an explicit reason"])
+
+    classDef veritas fill:#eef2ff,stroke:#4f46e5,color:#1e1b4b
+    classDef external fill:#fff7ed,stroke:#ea580c,color:#431407
+    class EE,RP,LO,GE,FL veritas
+    class RA,EXT external
+```
+
+What this buys you:
+
+- **A judge never talks to a repairer.** A finding becomes a `RepairPlan`
+  first. The agent receives that contract — never the judge's prose, never its
+  reasoning, never another agent's reasoning.
+- **A repairer's claim of success is not evidence.** The agent may report
+  `"status": "completed"`. The ledger only records an issue as `RESOLVED` when
+  the *next independent evaluation* stops reporting it.
+- **Nobody but the orchestrator decides to continue.** Not the judge, not the
+  agent. Every loop terminates with an explicit `StopReason`.
+- **Two agents can never argue with each other**, because they never meet.
+
+---
+
+## Autopilot: the bounded loop
+
+```bash
+veritas loop . --profile scientific-paper --max-iterations 5
+```
+
+```text
+EVALUATE
+   │
+gate passed? ── yes ─→ STOP (quality_gate_reached)
+   │ no
+PLAN REPAIR
+   │
+human required? ── yes ─→ STOP (human_decision_required)
+   │ no
+REPAIR  (the agent edits files in a workspace)
+   │
+RE-EVALUATE from scratch
+   │
+MEASURE DELTA  (resolved / improved / unchanged / regressed / new)
+   │
+stop condition? ── yes ─→ STOP
+   └── no ─→ EVALUATE
+```
+
+Three operating modes:
+
+| Mode | Command | Touches your files |
+| --- | --- | --- |
+| Audit | `veritas evaluate .` | never |
+| Assist | `veritas repair-plan .` | never — writes `repair-plan.json` |
+| Autopilot | `veritas loop .` | in a workspace, bounded and audited |
+
+Add `--dry-run` to see the plan autopilot *would* apply, and stop there.
+
+### The loop always stops
+
+```yaml
+loop:
+  enabled: true
+  max_iterations: 5
+  consecutive_non_improving_iterations: 2
+  same_blocker_repeated: 2
+  stop_on_new_critical: true
+  stop_on_regression: true
+  max_changed_files: 25
+  max_cost_usd: null
+```
+
+There is no configuration that produces an unbounded loop. Every run ends with
+one of: `quality_gate_reached`, `max_iterations`, `no_progress`,
+`repeated_blocker`, `regression`, `new_critical_finding`,
+`human_decision_required`, `cost_limit`, `change_limit`, `repair_failure`,
+`dry_run`, `nothing_to_repair`.
+
+Progress is measured by **blocking findings and issue resolution**, never by an
+aggregate score. A quality number rising from 81 to 83 while a new critical
+finding appears is not progress; the loop stops.
+
+### The safety invariant
+
+> Veritas may autonomously improve how existing evidence is **represented,
+> implemented, documented or validated**. It must never autonomously **fabricate
+> missing evidence** in order to satisfy its own evaluator.
+
+This is enforced mechanically, not by prompt wording:
+
+```text
+results/run_summary.json already contains N=10, mean=0.873, std=0.004
+  → "add the run count and variance to the manuscript"
+  → autonomous. The values exist; only their representation was missing.
+
+a judge asks for 30 seeds, and no such run exists
+  → requires_new_evidence = true
+  → requires_human_approval = true
+  → STOP: human_decision_required
+```
+
+An action needing evidence that does not exist is never handed to an agent. If
+an agent reports creating evidence anyway, the loop stops and asks for a human.
+
+By default, only documentation, source code and tests are autonomous:
+
+```yaml
+repair:
+  mode: autopilot
+  agent:
+    provider: generic-cli
+    command: [codex, exec, "{prompt_file}"]   # or [claude, -p, "{prompt_file}"]
+  permissions:
+    documentation: true
+    source_code: true
+    tests: true
+    experiments: false       # new measurements
+    datasets: false          # data changes
+    scientific_claims: false # removing or altering a claim
+    methodology: false       # changing how something is evaluated
+```
+
+The agent is a worker, configured by a command template. Swapping Codex for
+another tool is one line of YAML; nothing else in Veritas changes.
+
+### Your originals are safe
+
+```yaml
+workspace:
+  mode: worktree     # worktree | snapshot | copy | current
+```
+
+Repairs happen in a git worktree when git is available, and in an isolated copy
+otherwise. Git is never required. Veritas never pushes, merges or rewrites your
+branches — it writes a patch and tells you where it is.
+
+```text
+STOP  quality_gate_reached
+
+Iterations: 3
+
+Changes are available at:
+  .veritas/workspaces/loop-2026-09-21T2210Z-a81c/
+
+Patch:
+  .veritas/loops/loop-2026-09-21T2210Z-a81c/final.patch
+```
+
+### Every iteration is preserved
+
+```text
+.veritas/loops/<loop-id>/
+├── loop.json
+├── loop-result.json
+├── loop-report.md
+├── ledger.json
+├── final.patch
+├── iteration-001/
+│   ├── evaluation/           a complete, independent evaluation run
+│   ├── findings-before.json
+│   ├── repair-plan.json
+│   ├── repair-result.json
+│   └── changes.patch
+└── iteration-002/
+    └── ... plus delta.json
+```
+
+Nothing historical is ever overwritten.
+
+```bash
+veritas diff 1 2        # compare two iterations, issue by issue
+veritas loop-report     # the final report
+veritas loop . --resume # continue from the previous ledger after doing the human work
+```
+
+---
+
 ## Design principles
 
 1. **Evaluation and generation are separate.** Nothing in this package writes
@@ -132,8 +343,13 @@ Blocking findings:
 8. **Profiles are configuration, not code.** See below.
 9. **Every evaluation is reproducible.** Each run records models, prompt
    digests, judge versions, profile version, config and artifact commit.
-10. **Repair is separate from evaluation.** A run emits `repair-plan.json`;
-    applying it is a different, explicitly invoked step.
+10. **Repair is separate from evaluation.** The repairer applies changes; it
+    never judges whether its own work succeeded. Only the next independent
+    evaluation decides that, and only the orchestrator decides to continue.
+11. **The loop is always bounded.** Every run ends with an explicit stop
+    reason, and no configuration can make it unbounded.
+12. **Evidence is never fabricated to pass the gate.** See the safety
+    invariant above.
 
 ---
 
@@ -232,7 +448,12 @@ spots do not decide the outcome.
 | `veritas claims` | Show the claim graph and evidence coverage |
 | `veritas findings --severity major` | Filter the latest findings |
 | `veritas gate` | Print the gate status and exit with its code |
-| `veritas repair-plan` | Print the advisory repair plan |
+| `veritas repair-plan` | Assist mode: evaluate and write `repair-plan.json`, change nothing |
+| `veritas loop` | Autopilot: the bounded evaluate, repair, re-evaluate loop |
+| `veritas loop --dry-run` | Show what autopilot would do, and stop |
+| `veritas loop --resume` | Continue from the previous loop's ledger |
+| `veritas loop-report` | Show the report from the latest loop |
+| `veritas diff <a> <b>` | Compare two evaluations issue by issue |
 | `veritas profiles` | List every discoverable profile |
 
 Exit codes: `0` pass, `1` pass with warnings, `2` revise, `3` fail, `4` usage
@@ -333,6 +554,8 @@ and [`CONTRIBUTING.md`](CONTRIBUTING.md) for the contributor checklist.
 
 | Topic | Where |
 | --- | --- |
+| End-to-end walkthrough | [`docs/END_TO_END.md`](docs/END_TO_END.md) |
+| The repair loop | [`docs/LOOP.md`](docs/LOOP.md) |
 | Writing a profile | [`docs/PROFILES.md`](docs/PROFILES.md) |
 | Spec-driven workflow | [`docs/OPENSPEC.md`](docs/OPENSPEC.md) |
 | Small-project adoption | [`docs/ADOPTION.md`](docs/ADOPTION.md) |
@@ -346,8 +569,8 @@ and [`CONTRIBUTING.md`](CONTRIBUTING.md) for the contributor checklist.
 
 ## Status
 
-v0.1. Not implemented yet, by design: automatic repair (`veritas repair`) and
-any web UI. The CLI comes first.
+v0.1 plus the bounded repair loop. Not implemented, by design: a web UI, and
+automatic GitHub PR creation. The CLI comes first.
 
 ---
 

@@ -81,6 +81,120 @@ class ExecutionConfig(BaseModel):
     env_passthrough: list[str] = Field(default_factory=list)
 
 
+# ── Repair configuration ─────────────────────────────────────────────────────
+# These live here rather than in veritas.repair because they are configuration:
+# keeping them in config.py is also what keeps the config and repair packages
+# free of a circular import.
+
+# Which permission key governs which action type.
+ACTION_PERMISSION: dict[str, str] = {
+    "artifact_edit": "documentation",
+    "documentation": "documentation",
+    "code_change": "source_code",
+    "test_change": "tests",
+    "experiment": "experiments",
+    "dataset_change": "datasets",
+    "claim_change": "scientific_claims",
+    "human_decision": "human_decision",
+}
+
+
+class RepairPermissions(BaseModel):
+    """What the repair agent is allowed to do, by category.
+
+    The defaults are deliberate: representation-level work is autonomous;
+    anything that would create or alter evidence, methodology or a scientific
+    claim is not.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    documentation: bool = True
+    source_code: bool = True
+    tests: bool = True
+    experiments: bool = False
+    datasets: bool = False
+    scientific_claims: bool = False
+    methodology: bool = False
+    human_decision: bool = False
+
+    edit_files: bool = True
+    run_tests: bool = False
+    run_build: bool = False
+
+    def allows(self, action_type: str) -> bool:
+        key = ACTION_PERMISSION.get(action_type)
+        if key is None:
+            return False
+        return bool(getattr(self, key, False))
+
+    def reason_for(self, action_type: str) -> str:
+        key = ACTION_PERMISSION.get(action_type, action_type)
+        return (
+            f"action type '{action_type}' requires repair.permissions.{key}, "
+            "which is disabled. Enable it explicitly, or resolve this finding by hand."
+        )
+
+
+class RepairAgentConfig(BaseModel):
+    """How to reach the configured repair agent."""
+
+    model_config = ConfigDict(extra="allow")
+
+    provider: str = "mock"
+    command: list[str] = Field(default_factory=list)
+    timeout: float = 1800.0
+    working_dir: str | None = None
+    env_passthrough: list[str] = Field(default_factory=list)
+    prompt_version: str = "1"
+
+
+class RepairConfig(BaseModel):
+    """The ``repair:`` block of veritas.yaml."""
+
+    model_config = ConfigDict(extra="allow")
+
+    mode: str = "autopilot"
+    agent: RepairAgentConfig = Field(default_factory=RepairAgentConfig)
+    permissions: RepairPermissions = Field(default_factory=RepairPermissions)
+    workspace: str = "current"  # current | copy | worktree
+
+
+class LoopConfig(BaseModel):
+    """The ``loop:`` block: how the bounded repair loop may run.
+
+    Every field here exists to make the loop stop. There is no configuration
+    that produces an unbounded loop.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = True
+    max_iterations: int = 5
+    consecutive_non_improving_iterations: int = 2
+    same_blocker_repeated: int = 2
+    stop_on_new_critical: bool = True
+    stop_on_regression: bool = True
+    accept_warnings: bool = True
+    max_cost_usd: float | None = None
+    max_changed_files: int | None = 25
+
+
+class WorkspaceConfig(BaseModel):
+    """Where repairs happen, and what counts as part of the artifact."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["current", "copy", "snapshot", "worktree"] = "worktree"
+    include_untracked: bool = True
+    respect_gitignore: bool = True
+    respect_veritasignore: bool = True
+
+    def resolved_mode(self) -> str:
+        """``snapshot`` is a copy of the tree as it stands, uncommitted work included."""
+        return "copy" if self.mode == "snapshot" else self.mode
+
+
 class ArtifactConfig(BaseModel):
     """Which paths make up the artifact."""
 
@@ -104,11 +218,20 @@ class VeritasConfig(BaseModel):
     gate: GatePolicy | None = None
     checks: dict[str, CheckConfig] = Field(default_factory=dict)
     execution: ExecutionConfig = Field(default_factory=ExecutionConfig)
+    loop: LoopConfig = Field(default_factory=LoopConfig)
+    repair: RepairConfig = Field(default_factory=RepairConfig)
+    workspace: WorkspaceConfig = Field(default_factory=WorkspaceConfig)
     concurrency: int = 4
     root: Path = Field(default_factory=Path.cwd, exclude=True)
 
     def runs_dir(self) -> Path:
         return self.root / RUNS_DIRNAME / "runs"
+
+    def loops_dir(self) -> Path:
+        return self.root / RUNS_DIRNAME / "loops"
+
+    def workspaces_dir(self) -> Path:
+        return self.root / RUNS_DIRNAME / "workspaces"
 
 
 def interpolate_env(value: Any, *, missing: list[str] | None = None) -> Any:

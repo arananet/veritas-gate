@@ -1,0 +1,323 @@
+"""Loop reporting: the autopilot console experience and the final report."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
+
+from veritas.models.evaluation import EvaluationResult, GateResult
+from veritas.models.loop import STOP_REASON_TEXT, EvaluationDelta, LoopResult, StopReason
+from veritas.models.repair import RepairPlan, RepairResult
+from veritas.reports.console import GATE_STYLE, SEVERITY_STYLE
+
+STOP_STYLE: dict[StopReason, str] = {
+    StopReason.QUALITY_GATE_REACHED: "bold green",
+    StopReason.HUMAN_DECISION_REQUIRED: "bold yellow",
+    StopReason.DRY_RUN: "bold cyan",
+}
+
+
+class LoopReporter:
+    """Streams the autopilot run as it happens."""
+
+    def __init__(self, console: Console | None = None, *, quiet: bool = False) -> None:
+        self.console = console or Console()
+        self.quiet = quiet
+
+    def header(self, profile: str, artifact: str, mode: str, max_iterations: int) -> None:
+        if self.quiet:
+            return
+        title = "Veritas Autopilot" if mode == "autopilot" else "Veritas Autopilot (dry run)"
+        self.console.print()
+        self.console.print(Text(title, style="bold white"))
+        self.console.print()
+        self.console.print(f"Profile:  [bold]{profile}[/bold]")
+        self.console.print(f"Artifact: [bold]{artifact}[/bold]")
+        self.console.print(f"Budget:   up to {max_iterations} iteration(s)")
+        self.console.print()
+
+    def progress(self, event: str, payload: dict[str, Any]) -> None:
+        if self.quiet:
+            return
+        handler = {
+            "iteration": self._iteration,
+            "evaluated": self._evaluated,
+            "planned": self._planned,
+            "repairing": self._repairing,
+            "repaired": self._repaired,
+            "delta": self._delta,
+        }.get(event)
+        if handler is not None:
+            handler(payload)
+
+    # ------------------------------------------------------------- events
+
+    def _iteration(self, payload: dict[str, Any]) -> None:
+        self.console.rule(
+            f"[bold]Iteration {payload['iteration']} / {payload['total']}[/bold]",
+            style="dim",
+        )
+
+    def _evaluated(self, payload: dict[str, Any]) -> None:
+        gate: GateResult = payload["gate"]
+        self.console.print("Evaluating...")
+        self.console.print(
+            f"  [{SEVERITY_STYLE['critical']}]Critical: {gate.critical}[/]"
+            f"  [{SEVERITY_STYLE['major']}]Major: {gate.major}[/]"
+            f"  [{SEVERITY_STYLE['minor']}]Minor: {gate.minor}[/]"
+        )
+        style = GATE_STYLE[gate.status]
+        self.console.print(f"  Gate: [{style}]{gate.status}[/{style}]")
+        self.console.print()
+
+    def _planned(self, payload: dict[str, Any]) -> None:
+        plan: RepairPlan = payload["plan"]
+        autonomous = len(plan.autonomous_actions)
+        human = len(plan.human_actions)
+        self.console.print("Repair plan:")
+        self.console.print(f"  {autonomous} autonomous action(s)")
+        if human:
+            self.console.print(f"  [yellow]{human} human-only action(s)[/yellow]")
+        self.console.print()
+
+    def _repairing(self, payload: dict[str, Any]) -> None:
+        self.console.print("Applying autonomous repairs...")
+
+    def _repaired(self, payload: dict[str, Any]) -> None:
+        repair: RepairResult = payload["repair"]
+        for action_id in repair.action_ids:
+            mark = "✓" if repair.status == "completed" else "!"
+            style = "green" if repair.status == "completed" else "yellow"
+            self.console.print(f"  [{style}]{mark}[/{style}] {action_id}")
+        changed = payload.get("changed") or []
+        if changed:
+            self.console.print(f"  [dim]{len(changed)} file(s) changed[/dim]")
+        self.console.print()
+
+    def _delta(self, payload: dict[str, Any]) -> None:
+        delta: EvaluationDelta = payload["delta"]
+        self.console.print("Re-evaluating...")
+        self.console.print(f"  [green]Resolved:   {len(delta.resolved)}[/green]")
+        self.console.print(f"  [cyan]Improved:   {len(delta.improved)}[/cyan]")
+        self.console.print(f"  Unchanged:  {len(delta.unchanged)}")
+        self.console.print(f"  [red]Regressed:  {len(delta.regressed)}[/red]")
+        self.console.print(f"  [yellow]New:        {len(delta.new_findings)}[/yellow]")
+        self.console.print()
+
+    # ------------------------------------------------------------ summary
+
+    def summary(self, result: LoopResult) -> None:
+        if self.quiet:
+            self.console.print(result.stop_reason.value)
+            return
+        style = STOP_STYLE.get(result.stop_reason, "bold red")
+        self.console.print()
+        self.console.print(
+            Panel(
+                Text(result.stop_reason.value.upper(), style=style),
+                title="STOP",
+                border_style=style,
+                expand=False,
+            )
+        )
+        self.console.print()
+        self.console.print(result.stop_detail or STOP_REASON_TEXT.get(result.stop_reason, ""))
+        self.console.print()
+
+        if result.final_gate is not None:
+            gate_style = GATE_STYLE[result.final_gate.status]
+            self.console.print(
+                f"Final gate: [{gate_style}]{result.final_gate.status}[/{gate_style}]"
+            )
+        self.console.print(f"Iterations: {len(result.iterations)}")
+        if result.files_changed:
+            self.console.print(f"Files changed: {len(result.files_changed)}")
+
+        blockers = [
+            entry
+            for entry in result.ledger
+            if entry.status in ("OPEN", "UNCHANGED", "REGRESSED", "HUMAN_REVIEW") and entry.blocking
+        ]
+        if blockers:
+            self.console.print()
+            self.console.print("Remaining blockers:")
+            for entry in blockers:
+                self.console.print(
+                    f"  [{SEVERITY_STYLE[entry.severity]}]{entry.id}[/] {entry.title}"
+                )
+                if entry.notes:
+                    self.console.print(f"    [dim]{entry.notes[-1]}[/dim]")
+
+        if result.stop_reason is StopReason.HUMAN_DECISION_REQUIRED:
+            self.console.print()
+            self.console.print(
+                "[yellow]Autonomous generation of experimental evidence is prohibited.[/yellow]"
+            )
+            self.console.print(
+                "Do the work by hand, then resume with: [bold]veritas loop . --resume[/bold]"
+            )
+
+        if result.workspace and result.mode == "autopilot":
+            self.console.print()
+            self.console.print(f"Changes are available at:\n  {result.workspace}")
+
+    def plan_preview(self, plan: RepairPlan) -> None:
+        """Print a plan without applying it (assist mode and dry runs)."""
+        if not plan.actions:
+            self.console.print("No repair actions were derived from the findings.")
+            return
+        table = Table(box=None, pad_edge=False)
+        table.add_column("ID", style="bold")
+        table.add_column("Priority")
+        table.add_column("Type")
+        table.add_column("Findings", style="dim")
+        table.add_column("Autonomous")
+        for action in plan.actions:
+            table.add_row(
+                action.id,
+                action.priority,
+                action.action_type,
+                ", ".join(action.finding_ids),
+                Text("yes", style="green") if action.autonomous else Text("human", style="yellow"),
+            )
+        self.console.print(table)
+        blocked = [action for action in plan.actions if not action.autonomous]
+        if blocked:
+            self.console.print()
+            for action in blocked:
+                self.console.print(f"[yellow]{action.id}[/yellow]: {action.blocked_reason}")
+
+    def diff(self, delta: EvaluationDelta) -> None:
+        for label, items, style in (
+            ("Resolved", delta.resolved, "green"),
+            ("Improved", delta.improved, "cyan"),
+            ("Unchanged", delta.unchanged, ""),
+            ("Regressed", delta.regressed, "red"),
+            ("New", delta.new_findings, "yellow"),
+        ):
+            self.console.print(f"[{style}]{label}:[/{style}]" if style else f"{label}:")
+            for item in items:
+                self.console.print(f"  {item}")
+            if not items:
+                self.console.print("  none")
+            self.console.print()
+
+
+def render_loop_report(result: LoopResult, evaluation: EvaluationResult | None = None) -> str:
+    """The final Markdown report for a loop."""
+    lines: list[str] = [
+        "# Veritas Gate — Loop Report",
+        "",
+        f"**Stop reason:** `{result.stop_reason.value}`",
+        "",
+        result.stop_detail or STOP_REASON_TEXT.get(result.stop_reason, ""),
+        "",
+        "## Summary",
+        "",
+        f"- Loop id: `{result.loop_id}`",
+        f"- Profile: {result.profile}",
+        f"- Artifact: {result.artifact_id}",
+        f"- Mode: {result.mode}",
+        f"- Iterations: {len(result.iterations)}",
+        f"- Initial gate: {result.initial_gate.status if result.initial_gate else 'n/a'}",
+        f"- Final gate: {result.final_gate.status if result.final_gate else 'n/a'}",
+        f"- Workspace: {result.workspace or 'in place'}",
+        f"- Original commit: {result.original_commit or 'not a git checkout'}",
+        f"- Started: {result.started_at.isoformat()}",
+        f"- Finished: {result.finished_at.isoformat() if result.finished_at else 'n/a'}",
+        "",
+        "## Iterations",
+        "",
+        "| # | Gate | Actions planned | Autonomous | Repair | Resolved | Regressed | New |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for record in result.iterations:
+        plan = record.plan
+        delta = record.delta
+        lines.append(
+            f"| {record.iteration} | {record.gate.status} "
+            f"| {len(plan.actions) if plan else 0} "
+            f"| {len(plan.autonomous_actions) if plan else 0} "
+            f"| {record.repair.status if record.repair else '-'} "
+            f"| {len(delta.resolved) if delta else '-'} "
+            f"| {len(delta.regressed) if delta else '-'} "
+            f"| {len(delta.new_findings) if delta else '-'} |"
+        )
+    lines.append("")
+
+    lines.extend(["## Findings ledger", ""])
+    if result.ledger:
+        lines.extend(
+            [
+                "| Issue | Status | Severity | Title | Iterations |",
+                "| --- | --- | --- | --- | --- |",
+            ]
+        )
+        for entry in result.ledger:
+            iterations = ", ".join(str(item) for item in entry.seen_in_iterations)
+            lines.append(
+                f"| {entry.id} | {entry.status} | {entry.severity.upper()} "
+                f"| {entry.title} | {iterations} |"
+            )
+    else:
+        lines.append("No findings were recorded.")
+    lines.append("")
+
+    resolved = [entry for entry in result.ledger if entry.status == "RESOLVED"]
+    remaining = [
+        entry for entry in result.ledger if entry.status not in ("RESOLVED", "ACCEPTED_RISK")
+    ]
+    lines.extend(
+        [
+            "## Outcome",
+            "",
+            f"- Resolved: {len(resolved)}",
+            f"- Remaining: {len(remaining)}",
+            f"- Files changed: {len(result.files_changed)}",
+            "",
+        ]
+    )
+    if result.files_changed:
+        lines.extend([f"  - `{path}`" for path in result.files_changed])
+        lines.append("")
+
+    lines.extend(["## Repair actions", ""])
+    any_action = False
+    for record in result.iterations:
+        if record.plan is None:
+            continue
+        any_action = True
+        lines.append(f"### Iteration {record.iteration}")
+        lines.append("")
+        for action in record.plan.actions:
+            status = "autonomous" if action.autonomous else "human decision required"
+            lines.append(
+                f"- **{action.id}** ({action.priority}, {action.action_type}, {status}) — "
+                f"findings {', '.join(action.finding_ids)}"
+            )
+            if action.blocked_reason:
+                lines.append(f"  - {action.blocked_reason}")
+        lines.append("")
+    if not any_action:
+        lines.extend(["No repair actions were planned.", ""])
+
+    if result.human_decisions:
+        lines.extend(
+            [
+                "## Human decisions required",
+                "",
+                *[f"- {item}" for item in result.human_decisions],
+                "",
+                "Veritas may improve how existing evidence is represented, implemented,",
+                "documented or validated. It will not fabricate missing evidence to satisfy",
+                "its own evaluator.",
+                "",
+            ]
+        )
+
+    lines.extend(["## Usage", "", f"- {result.usage}", ""])
+    return "\n".join(lines).rstrip() + "\n"

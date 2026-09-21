@@ -50,6 +50,9 @@ packages = ["src/veritas"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# So the suite runs identically under `pytest` and `python -m pytest`:
+# shared test helpers are imported as `tests.<module>`.
+pythonpath = ["."]
 asyncio_mode = "auto"
 filterwarnings = ["error::DeprecationWarning:veritas.*"]
 

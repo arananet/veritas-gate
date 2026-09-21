@@ -147,9 +147,23 @@ def _read_tree(root: Path, directory: Path) -> list[ArtifactSegment]:
     for path in sorted(directory.rglob("*")):
         if not path.is_file():
             continue
-        if any(part in SKIP_DIRECTORIES for part in path.parts):
+        if _is_skipped(root, path):
             continue
         segment = _read_file(root, path)
         if segment is not None:
             segments.append(segment)
     return segments
+
+
+def _is_skipped(root: Path, path: Path) -> bool:
+    """Match the skip list against the path *relative to the artifact root*.
+
+    Matching absolute parts would hide the whole artifact whenever the root
+    itself sits under a skipped name — which is exactly what happens to a
+    repair workspace living under ``.veritas/workspaces/``.
+    """
+    try:
+        relative = path.relative_to(root)
+    except ValueError:
+        relative = path
+    return any(part in SKIP_DIRECTORIES for part in relative.parts)
