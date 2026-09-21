@@ -1,0 +1,247 @@
+"""GenericCLIRepairAgent: drive any CLI coding agent as a worker.
+
+The command is a template, so the same adapter drives whichever tool you have:
+
+```yaml
+repair:
+  agent:
+    provider: generic-cli
+    command: [codex, exec, "{prompt_file}"]
+```
+
+```yaml
+repair:
+  agent:
+    provider: generic-cli
+    command: [claude, -p, "{prompt_file}"]
+```
+
+Nothing about a specific vendor is encoded here, so swapping the tool is a
+configuration change and the rest of Veritas is unaffected. A vendor-specific
+agent (Codex, Claude Code, an API-backed one, a human queue) can be added later
+as another implementation of the same protocol without touching the orchestrator.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import os
+from importlib import resources
+from pathlib import Path
+from typing import Any
+
+from veritas.artifacts.base import Artifact
+from veritas.models.repair import AppliedChange, RepairPlan, RepairResult
+from veritas.repair.base import enforce_permissions
+from veritas.repair.permissions import RepairAgentConfig, RepairPermissions
+from veritas.repair.workspace import Workspace
+
+ALWAYS_PASSTHROUGH = ("PATH", "HOME", "LANG", "LC_ALL", "TMPDIR")
+OUTPUT_LIMIT = 16_000
+
+
+class GenericCLIRepairAgent:
+    """Invoke a configured CLI agent with a generated prompt and plan."""
+
+    name = "generic-cli"
+
+    def __init__(
+        self,
+        config: RepairAgentConfig,
+        permissions: RepairPermissions | None = None,
+        *,
+        prompt: str | None = None,
+    ) -> None:
+        self.config = config
+        self.permissions = permissions or RepairPermissions()
+        self.prompt_template = prompt if prompt is not None else load_repair_prompt()
+
+    async def repair(
+        self,
+        artifact: Artifact,
+        plan: RepairPlan,
+        workspace: Workspace,
+    ) -> RepairResult:
+        enforce_permissions(plan, self.permissions)
+
+        if not self.config.command:
+            return _failed(plan, "repair.agent.command is not configured")
+
+        tmp = workspace.root / ".veritas" / "tmp"
+        tmp.mkdir(parents=True, exist_ok=True)
+        plan_file = tmp / f"repair-plan-{plan.iteration:03d}.json"
+        prompt_file = tmp / f"repair-prompt-{plan.iteration:03d}.md"
+        result_file = tmp / f"repair-result-{plan.iteration:03d}.json"
+        result_file.unlink(missing_ok=True)
+
+        plan_file.write_text(
+            json.dumps(plan.model_dump(mode="json"), indent=2) + "\n", encoding="utf-8"
+        )
+        prompt_file.write_text(self.render_prompt(plan, plan_file, result_file), encoding="utf-8")
+
+        command = [
+            _template(part, plan_file, prompt_file, result_file, workspace)
+            for part in self.config.command
+        ]
+        before = workspace.snapshot()
+
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *command,
+                cwd=str(workspace.root),
+                env=self._environment(),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+            stdout, _ = await asyncio.wait_for(process.communicate(), timeout=self.config.timeout)
+            returncode = process.returncode or 0
+            output = stdout.decode("utf-8", errors="replace")[-OUTPUT_LIMIT:]
+        except TimeoutError:
+            process.kill()
+            return _failed(plan, f"the repair command timed out after {self.config.timeout:.0f}s")
+        except (OSError, ValueError) as exc:
+            return _failed(plan, f"the repair command could not be started: {exc}")
+
+        changed = workspace.changed_since(before)
+        changed = [path for path in changed if not path.startswith(".veritas/")]
+        reported = _read_result(result_file)
+
+        if reported is not None:
+            # Trust the agent's report for narrative fields, but the changed-file
+            # list comes from the filesystem, not from the agent's claim.
+            reported.changes = _merge_changes(reported.changes, changed)
+            reported.metadata = {
+                **reported.metadata,
+                "agent": self.name,
+                "command": command,
+                "exit_code": returncode,
+                "output": output,
+            }
+            return reported
+
+        status = (
+            "completed" if returncode == 0 and changed else "failed" if returncode else "partial"
+        )
+        notes = [f"the agent wrote no result file; status inferred from exit code {returncode}"]
+        if returncode == 0 and not changed:
+            notes.append("the command succeeded but changed nothing")
+        return RepairResult(
+            action_ids=[action.id for action in plan.actions],
+            status=status,  # type: ignore[arg-type]
+            changes=[
+                AppliedChange(file=path, description="changed by the repair agent")
+                for path in changed
+            ],
+            notes=notes,
+            metadata={
+                "agent": self.name,
+                "command": command,
+                "exit_code": returncode,
+                "output": output,
+            },
+        )
+
+    def render_prompt(self, plan: RepairPlan, plan_file: Path, result_file: Path) -> str:
+        """Build the repair prompt.
+
+        The agent is given the normalized plan, never the judges' raw output,
+        their reasoning, or any previous agent's reasoning.
+        """
+        sections = [
+            self.prompt_template.strip(),
+            "## Permissions",
+            "",
+            f"- Edit files: {_yesno(self.permissions.edit_files)}",
+            f"- Run tests: {_yesno(self.permissions.run_tests)}",
+            f"- Run build: {_yesno(self.permissions.run_build)}",
+            f"- Run experiments: {_yesno(self.permissions.experiments)}",
+            f"- Modify datasets: {_yesno(self.permissions.datasets)}",
+            f"- Modify methodology: {_yesno(self.permissions.methodology)}",
+            f"- Alter scientific claims: {_yesno(self.permissions.scientific_claims)}",
+            "",
+            f"## Repair plan (iteration {plan.iteration})",
+            "",
+            f"The machine-readable plan is at `{plan_file}`.",
+            f"Write your result to `{result_file}`.",
+            "",
+        ]
+        for action in plan.actions:
+            sections.extend(
+                [
+                    f"### {action.id} ({action.priority}, {action.action_type})",
+                    "",
+                    action.instruction.strip(),
+                    "",
+                    "Allowed files:",
+                    *(
+                        [f"- `{path}`" for path in action.allowed_files]
+                        or ["- (none specified; make the smallest change that resolves this)"]
+                    ),
+                    "",
+                ]
+            )
+        return "\n".join(sections)
+
+    def _environment(self) -> dict[str, str]:
+        env: dict[str, str] = {}
+        for name in (*ALWAYS_PASSTHROUGH, *self.config.env_passthrough):
+            value = os.environ.get(name)
+            if value is not None:
+                env[name] = value
+        return env
+
+
+def load_repair_prompt() -> str:
+    """Load the versioned repair prompt shipped with the package."""
+    resource = resources.files("veritas.repair") / "prompts" / "repair.md"
+    return resource.read_text(encoding="utf-8")
+
+
+def _template(
+    part: str, plan_file: Path, prompt_file: Path, result_file: Path, workspace: Workspace
+) -> str:
+    return (
+        part.replace("{prompt_file}", str(prompt_file))
+        .replace("{repair_prompt_file}", str(prompt_file))
+        .replace("{plan_file}", str(plan_file))
+        .replace("{result_file}", str(result_file))
+        .replace("{workspace}", str(workspace.root))
+    )
+
+
+def _read_result(path: Path) -> RepairResult | None:
+    if not path.is_file():
+        return None
+    try:
+        payload: Any = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    try:
+        return RepairResult.model_validate(payload)
+    except Exception:
+        return None
+
+
+def _merge_changes(reported: list[AppliedChange], observed: list[str]) -> list[AppliedChange]:
+    """Reconcile what the agent said it changed with what actually changed."""
+    described = {change.file: change.description for change in reported}
+    return [
+        AppliedChange(file=path, description=described.get(path, "changed by the repair agent"))
+        for path in observed
+    ]
+
+
+def _yesno(value: bool) -> str:
+    return "yes" if value else "NO"
+
+
+def _failed(plan: RepairPlan, message: str) -> RepairResult:
+    return RepairResult(
+        action_ids=[action.id for action in plan.actions],
+        status="failed",
+        notes=[message],
+        metadata={"agent": GenericCLIRepairAgent.name},
+    )

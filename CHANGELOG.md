@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `{{PROJECT_NAME}}` will be documented in this file.
+All notable changes to `veritas-gate` will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -23,8 +23,48 @@ Guidelines:
 
 ### Added
 
+- Bounded evaluation → repair → re-evaluation loop (spec: bounded-repair-loop).
+  - `veritas loop` (autopilot), `veritas repair-plan` (assist), `veritas loop-report`,
+    `veritas diff`, plus `--dry-run`, `--resume` and `--max-iterations`.
+  - `LoopOrchestrator` as an explicit state machine; every run terminates with one of
+    twelve `StopReason` values and no configuration can make it unbounded.
+  - `RepairPlanner` converts findings into a normalized repair contract; a judge never
+    speaks to a repair agent, and the evaluator never sees the agent's reasoning or its
+    claim that something was fixed.
+  - `RepairAgent` protocol with `MockRepairAgent` and `GenericCLIRepairAgent`, the latter
+    driving any CLI coding agent through a command template.
+  - `FindingLedger` gives each logical issue a stable identity across iterations;
+    `compare_evaluations` measures progress by blocking findings and issue resolution,
+    never by an aggregate score.
+  - Workspaces (git worktree, snapshot, copy or in place) so originals stay untouched;
+    git is used when available and never required.
+  - Safety invariant, enforced in code rather than prompt wording: Veritas may improve how
+    existing evidence is represented, implemented, documented or validated, and will not
+    fabricate missing evidence to satisfy its own evaluator.
+  - Every iteration preserved under `.veritas/loops/<loop-id>/`, with patches and a final
+    `loop-report.md` and `loop-result.json`.
+- Veritas Gate v0.1: the core evaluation framework (spec: veritas-core-evaluation-engine).
+  - Domain models: `Artifact`, `Finding`, `JudgeResult`, `CheckResult`, `Claim`, `EvaluationResult`.
+  - Profiles as plugins: `scientific-paper` and `generic-document`, discovered from config,
+    the project tree, `VERITAS_PROFILE_PATH`, the package, and `veritas.profiles` entry points.
+  - Provider adapters for Anthropic, OpenAI, OpenAI-compatible endpoints and Google, with
+    structured output, retries, timeouts and token-usage metadata.
+  - Blind independent LLM judges, deterministic allow-listed checks, a claim graph with
+    evidence coverage, a MetaJudge that preserves critical findings, and a deterministic gate.
+  - Immutable runs under `.veritas/runs/`, Markdown and JSON reports, and an advisory
+    `repair-plan.json`.
+  - The `veritas` CLI (`init`, `evaluate`, `report`, `findings`, `claims`, `gate`,
+    `repair-plan`, `profiles`) with CI-meaningful exit codes.
+  - Prompt-injection containment: artifact content is wrapped as untrusted data, finding ids
+    are assigned by Veritas, and nothing executes unless listed in `execution.allow`.
 - Shared local/CI Markdown lint runner with locked dependencies, `make setup-lint`, `make lint-markdown`, and `make verify-template` (spec: lean-agent-workflow).
 - Persistent verification evidence, stale-state detection, pause/resume and optional bounded local agent adapters (spec: reliable-verification-and-resumable-execution).
+
+### Fixed
+
+- Artifact and workspace file discovery matched the skip list against absolute path parts,
+  so an artifact rooted under a skipped directory name (such as a repair workspace under
+  `.veritas/workspaces/`) appeared empty to judges and checks (spec: bounded-repair-loop).
 
 ### Changed
 
@@ -71,4 +111,4 @@ Commits: `0a92a2d`, `035a861`, `5adbfbe`.
 
 - Initial repository commit (`d07225a`). No tagged release date is recorded in the local Git history.
 
-[Unreleased]: https://github.com/{{GITHUB_OWNER}}/{{PROJECT_NAME}}/commits/HEAD
+[Unreleased]: https://github.com/arananet/veritas-gate/commits/HEAD

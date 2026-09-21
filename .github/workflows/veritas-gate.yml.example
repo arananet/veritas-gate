@@ -1,0 +1,50 @@
+# Veritas Gate in CI.
+#
+# Copy to .github/workflows/veritas-gate.yml in the repository whose artifacts
+# you want evaluated, and set the API key secret for whichever provider your
+# veritas.yaml routes judges to.
+#
+# `veritas evaluate` exits non-zero when the gate does not pass (1 warnings,
+# 2 revise, 3 fail), so the job fails on its own with no extra scripting.
+name: Veritas Gate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -e .
+
+      - name: Evaluate
+        run: veritas evaluate .
+        env:
+          # Only the providers your veritas.yaml actually uses need a key.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          VERITAS_DEFAULT_MODEL: ${{ vars.VERITAS_DEFAULT_MODEL }}
+          VERITAS_ADVERSARIAL_MODEL: ${{ vars.VERITAS_ADVERSARIAL_MODEL }}
+          VERITAS_META_MODEL: ${{ vars.VERITAS_META_MODEL }}
+
+      # The run directory is the audit trail: keep it even when the gate fails.
+      - name: Upload the evaluation run
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: veritas-run
+          path: .veritas/

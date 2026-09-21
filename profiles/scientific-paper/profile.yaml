@@ -1,0 +1,82 @@
+# Scientific paper profile.
+#
+# This is a plugin, not core logic. The engine knows nothing about papers;
+# everything domain-specific lives in this file, rubric.yaml and prompts/.
+profile: scientific-paper
+version: "1"
+description: Peer-review-style evaluation of a manuscript and its supporting artifacts.
+artifact_type: document
+default_paths:
+  - .
+
+meta_model_role: meta
+
+judges:
+  - name: methodology
+    prompt: methodology.md
+    model_role: methodology
+    version: "1"
+    description: Research question, experimental design, controls, baselines, metrics.
+
+  - name: evidence
+    prompt: evidence.md
+    model_role: evidence
+    version: "1"
+    extracts_claims: true
+    description: Extracts the manuscript's claims and classifies how well each is supported.
+
+  - name: statistics
+    prompt: statistics.md
+    model_role: statistics
+    version: "1"
+    description: Sample size, runs, variance, tests, effect size, significance claims.
+
+  - name: reproducibility
+    prompt: reproducibility.md
+    model_role: reproducibility
+    version: "1"
+    description: Environment, data, seeds, commands, hardware, checkpoints.
+
+  - name: repo-consistency
+    prompt: repo_consistency.md
+    model_role: repo-consistency
+    version: "1"
+    description: Discrepancies between the manuscript and the implementation it describes.
+
+  - name: citations
+    prompt: citations.md
+    model_role: citations
+    version: "1"
+    description: Whether references exist, are well formed, and support their claims.
+
+  - name: adversarial
+    prompt: adversarial.md
+    model_role: adversarial
+    version: "1"
+    description: Actively hunts for rejection-level weaknesses.
+
+checks:
+  repository-structure:
+    type: required-paths
+    enabled: true
+    severity_on_failure: minor
+    required_paths: []
+
+  required-sections:
+    type: required-sections
+    enabled: true
+    severity_on_failure: major
+    required_sections:
+      - abstract
+      - introduction
+      - method
+      - results
+      - conclusion
+
+gate:
+  fail_on:
+    - critical
+  max_major: 0
+  max_minor: 20
+  require_checks: []
+  warn_on_minor: true

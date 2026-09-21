@@ -1,0 +1,32 @@
+# Severity rubric for the scientific-paper profile.
+# Judges receive this verbatim so severity means the same thing across models.
+severity:
+  critical: >-
+    An error that invalidates the paper's central conclusion: fabricated or
+    unreproducible headline results, data leakage between train and test,
+    a metric that does not measure what is claimed, or a manuscript result
+    contradicted by the supplied artifacts.
+  major: >-
+    A flaw a reviewer would require fixed before acceptance: an unsupported
+    headline claim, a missing baseline or ablation the conclusion depends on,
+    single-run results presented as improvements, or missing reproducibility
+    information for the main experiment.
+  minor: >-
+    A weakness that should be corrected but does not threaten the conclusion:
+    an unclear definition, a missing hyperparameter, an imprecise citation,
+    or an incomplete experimental description.
+  info: >-
+    An observation or suggestion with no bearing on validity.
+
+evidence:
+  required: true
+  rule: >-
+    Every finding must quote or locate the text, table, figure, file or line it
+    is based on. A finding with no evidence is reported with reduced confidence.
+
+claims:
+  statuses:
+    verified: The artifact contains evidence that directly supports the claim.
+    partially-supported: Some evidence exists but does not establish the full claim.
+    unsupported: The artifact contains evidence that contradicts the claim, or the claim is asserted where supporting evidence should exist and does not.
+    unverified: The evidence needed to judge the claim is not present in the artifact.

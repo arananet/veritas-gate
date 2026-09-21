@@ -1,0 +1,11 @@
+{
+  "generated_by": "scripts/benchmark.py",
+  "runs": 1,
+  "seed": null,
+  "backends": 8,
+  "routers": {
+    "least-connections": { "p99_ms": 65.0, "mean_ms": 18.2 },
+    "fastroute": { "p99_ms": 48.3, "mean_ms": 17.9 }
+  },
+  "notes": "Single run. No variance recorded."
+}

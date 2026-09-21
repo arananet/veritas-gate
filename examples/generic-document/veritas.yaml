@@ -1,0 +1,21 @@
+version: 1
+
+profile: generic-document
+
+artifact:
+  type: document
+  paths:
+    - architecture.md
+
+models:
+  default:
+    provider: ${VERITAS_DEFAULT_PROVIDER:-anthropic}
+    model: ${VERITAS_DEFAULT_MODEL:-claude-sonnet-4-5}
+
+gate:
+  fail_on:
+    - critical
+  max_major: 2
+
+execution:
+  allow: []

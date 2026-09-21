@@ -1,4 +1,4 @@
-# Contributing to {{PROJECT_NAME}}
+# Contributing to veritas-gate
 
 Thanks for taking the time to contribute! This project is built on
 **[OpenSpec](.openspec/)** — a spec-driven development workflow that keeps
@@ -39,8 +39,8 @@ flowchart LR
 ### 1. Fork and clone
 
 ```bash
-git clone https://github.com/{{GITHUB_OWNER}}/{{PROJECT_NAME}}.git
-cd {{PROJECT_NAME}}
+git clone https://github.com/arananet/veritas-gate.git
+cd veritas-gate
 bash setup.sh  # installs the OpenSpec git hooks locally
 ```
 

@@ -1,0 +1,78 @@
+---
+title: Bounded evaluation to repair to re-evaluation loop
+slug: bounded-repair-loop
+type: feature
+status: review
+author: Claude
+created_at: '2026-09-21'
+updated_at: '2026-09-21'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  Extend Veritas Gate with an autopilot mode: `veritas loop .` evaluates an
+  artifact, plans repairs from the findings, invokes a repair agent, re-evaluates
+  independently, measures the delta, and stops deterministically with an explicit
+  reason. The evaluation engine is extended, not redesigned.
+
+  The separation of responsibilities is the point of the feature and is
+  non-negotiable: the EvaluationEngine evaluates, the RepairPlanner converts
+  findings into a normalized contract, the RepairAgent applies authorized changes,
+  the GateEngine decides pass or fail deterministically, the FindingLedger tracks
+  issue identity across iterations, and the LoopOrchestrator decides whether to
+  continue. A repairer never judges its own repair.
+
+  The hard safety invariant: Veritas may autonomously improve how existing
+  evidence is represented, implemented, documented or validated. It must never
+  autonomously fabricate missing evidence in order to satisfy its own evaluator.
+acceptance_criteria:
+- "Given an artifact whose gate already passes, when `veritas loop` runs, then it performs exactly one evaluation, applies no repair, and stops with QUALITY_GATE_REACHED."
+- "Given a failing artifact and a repair agent that resolves its blockers, when the loop runs, then it evaluates, plans, repairs, re-evaluates, records a delta showing the findings resolved, and stops with QUALITY_GATE_REACHED."
+- "Given a loop configured with max_iterations N, when the gate never passes, then at most N evaluations occur and the loop stops with MAX_ITERATIONS."
+- "Given consecutive iterations with no reduction in blocking findings, when the configured non-improving limit is reached, then the loop stops with NO_PROGRESS."
+- "Given an iteration that increases blocking findings, when the delta is measured, then the loop stops with REGRESSION; a newly introduced critical finding stops with NEW_CRITICAL_FINDING."
+- "Given a repair plan containing an action that requires new evidence or human approval, when the loop reaches the repair phase, then no repair is applied and the loop stops with HUMAN_DECISION_REQUIRED naming the blocking finding."
+- "Given a repair action whose type is not permitted by `repair.permissions`, when the plan is built, then the action is marked as requiring human approval and is never handed to the agent."
+- "Given the same blocking finding persists across the configured number of iterations, when the ledger is consulted, then the loop stops with REPEATED_BLOCKER."
+- "Given `--dry-run`, when the loop runs, then it evaluates, prints the proposed actions, writes no changes to the artifact, and stops without invoking a repair agent."
+- "Given a completed loop, when it finishes, then `.veritas/loops/<loop-id>/` contains loop.json, loop-report.md, loop-result.json and a per-iteration directory holding the evaluation, findings-before.json, repair-plan.json, repair-result.json, delta.json and changes.patch, with no historical run overwritten."
+- "Given two evaluation runs, when `veritas diff <a> <b>` is invoked, then resolved, improved, unchanged, regressed and new findings are listed."
+- "Given a repair agent reports that it fixed a finding, when the artifact is re-evaluated, then the evaluator receives only the modified artifact: no repair prompt, no agent reasoning and no agent claim of success reaches any judge."
+test_plan:
+- 'Unit test: RepairPlanner converts findings into actions, groups them by finding, assigns priority from severity, and marks impermissible or evidence-requiring actions as human-only.'
+- 'Unit test: FindingLedger assigns stable identities across iterations and transitions issues through OPEN, RESOLVED, IMPROVED, UNCHANGED, REGRESSED and HUMAN_REVIEW.'
+- 'Unit test: compare_evaluations produces resolved, improved, unchanged, regressed and new-finding lists, and progress is judged from blocking findings rather than an aggregate score.'
+- 'Unit test: every stop condition (gate passed, max iterations, no progress, regression, repeated blocker, new critical finding, human decision, cost limit, change limit, repair failure) terminates with its own StopReason.'
+- 'Unit test: permission enforcement refuses experiment, dataset, methodology and claim-removal actions unless explicitly enabled.'
+- 'Unit test: an action requiring evidence that does not exist is never dispatched to an agent, covering the safety invariant.'
+- 'Unit test: Workspace copy mode leaves the original artifact untouched, and git patch capture works when git is present and is skipped when it is not.'
+- 'Unit test: GenericCLIRepairAgent templating writes the plan and prompt files, invokes only an allow-listed command, and builds a RepairResult from the changed files it detects.'
+- 'Integration test: a full multi-iteration loop over an example artifact with MockRepairAgent, asserting the iteration directories, the delta chain and the stop reason.'
+- 'Integration test: a loop that terminates with HUMAN_DECISION_REQUIRED because the remaining blocker needs experimental evidence that does not exist.'
+- 'Integration test: `veritas loop --dry-run` leaves every artifact file byte-identical.'
+qa_notes: |
+  Every test runs offline with MockRepairAgent. No external API, CLI agent or
+  Codex dependency is required by the suite.
+out_of_scope:
+- Web UI.
+- Automatic GitHub PR creation, pushing or merging.
+- Agent frameworks; orchestration stays explicit Python.
+- Provider-specific repair agents (Codex, Claude Code, OpenAI, human-in-the-loop) beyond leaving the interface open for them.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - Loop resolves all blockers and stops at the gate.
+  - Loop stops because the remaining blocker requires new experimental evidence.
+  metrics:
+  - Blocking findings per iteration.
+  - Resolved, regressed and newly introduced findings per iteration.
+technical_notes: |
+  The loop state machine is explicit, never `while True`. Every iteration is
+  persisted before the next begins. The repair agent receives the normalized
+  RepairPlan, the allowed files and its permissions, never raw judge output or
+  another agent's reasoning. Git is used when available for patches and commit
+  SHAs, but Veritas must work without it.
+linked_issues: []
+linked_prs: []

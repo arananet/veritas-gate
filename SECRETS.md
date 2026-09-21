@@ -72,7 +72,7 @@ If a secret is suspected to have leaked:
 3. Rotate the secret with the issuer immediately, even if you haven't pushed.
 4. Use `git reset` (if not pushed) or `git filter-repo` (if pushed) to
    remove it from history.
-5. Notify [`{{SECURITY_CONTACT}}`](mailto:{{SECURITY_CONTACT}}).
+5. Notify the maintainers through [GitHub private vulnerability reporting](https://github.com/arananet/veritas-gate/security/advisories/new).
 
 ## Tools
 

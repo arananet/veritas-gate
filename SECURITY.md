@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-Security fixes are applied to the latest release line of `{{PROJECT_NAME}}`.
+Security fixes are applied to the latest release line of `veritas-gate`.
 Older releases receive fixes only when explicitly flagged in the
 [CHANGELOG](CHANGELOG.md).
 
@@ -20,8 +20,10 @@ preference:
 
 1. **GitHub Private Vulnerability Reporting** — open the repository's
    **Security** tab and click **Report a vulnerability**.
-2. **Email** — send details to `{{SECURITY_CONTACT}}`. Encrypt with the
-   project's PGP key if the report contains exploit details.
+2. **Private advisory link** — https://github.com/arananet/veritas-gate/security/advisories/new
+
+This project does not publish a security email address; private vulnerability
+reporting through GitHub is the supported channel.
 
 ### What to include
 
