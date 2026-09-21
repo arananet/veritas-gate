@@ -10,7 +10,7 @@ artifact:
 models:
   default:
     provider: ${VERITAS_DEFAULT_PROVIDER:-anthropic}
-    model: ${VERITAS_DEFAULT_MODEL:-claude-opus-4-7}
+    model: ${VERITAS_DEFAULT_MODEL:-claude-opus-5}
 
 gate:
   fail_on:

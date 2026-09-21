@@ -85,7 +85,7 @@ agents:
   issue_autofix:
     enabled: false
     label: "agent:autofix"
-    model: "anthropic/claude-opus-4-7"
+    model: "anthropic/claude-opus-5"
     goal_file: ".github/agents/issue-autofix.md"
     # Hard caps on the agent's branch — exceeding either aborts the run.
     max_changed_files: 20

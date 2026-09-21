@@ -71,6 +71,10 @@ technical_notes: |
   catalog ids, which are a different namespace from the provider ids Veritas
   uses; the maintainer has verified the current names against that catalog.
 
+  The shipped default is claude-opus-5. Seven judges read the whole artifact on
+  every evaluation, so the per-run cost is a real choice: claude-sonnet-5 is the
+  documented step-down.
+
   Python 3.12+, Typer, Pydantic v2, httpx, PyYAML, Rich. asyncio orchestration
   implemented directly; no agent framework. Secrets come only from environment
   variables (.env.example documents them). Judges are blind in phase one: they

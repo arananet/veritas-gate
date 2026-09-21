@@ -68,7 +68,7 @@ jobs:
           fi
           enabled=$(yq '.agents.issue_autofix.enabled // false' "$CFG")
           label=$(yq '.agents.issue_autofix.label // "agent:autofix"' "$CFG")
-          model=$(yq '.agents.issue_autofix.model // "anthropic/claude-opus-4-7"' "$CFG")
+          model=$(yq '.agents.issue_autofix.model // "anthropic/claude-opus-5"' "$CFG")
           goal=$(yq '.agents.issue_autofix.goal_file // ".github/agents/issue-autofix.md"' "$CFG")
           maxf=$(yq '.agents.issue_autofix.max_changed_files // 20' "$CFG")
           maxl=$(yq '.agents.issue_autofix.max_diff_lines // 500' "$CFG")
