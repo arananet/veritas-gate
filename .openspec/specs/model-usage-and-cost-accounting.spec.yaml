@@ -1,0 +1,77 @@
+---
+title: Model usage and cost accounting per evaluation
+slug: model-usage-and-cost-accounting
+type: feature
+status: review
+author: Claude
+created_at: '2026-09-22'
+updated_at: '2026-09-22'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  An evaluation calls several models and the operator has no idea what it cost
+  or which model said what. Token counts are already captured per judge, but
+  they are flattened into two integers in the run manifest, the MetaJudge's own
+  call is dropped entirely, and nothing is shown on the console.
+
+  Three additions. Each judge result records the concrete model identifier it
+  ran on, not only its configured role, because a blind panel deliberately runs
+  judges on different models and a total that cannot be attributed per model is
+  not an accounting. Usage is aggregated into a structured summary: per judge,
+  per model, and in total, with the MetaJudge counted as the separate call it
+  is. And an optional pricing table in configuration turns tokens into money.
+
+  Pricing is configured, never bundled. Prices depend on the model, change
+  without notice, and differ by provider and tier; a stale rate compiled into
+  Veritas and then written into an immutable run record is worse than no rate
+  at all. With no pricing configured, Veritas reports tokens and says nothing
+  about cost. Where a model in the run has no matching price, the cost is
+  reported as partial and the unpriced models are named, so a total is never
+  quietly understated.
+acceptance_criteria:
+- "Given a judge that ran against a provider, when its result is recorded, then its metadata names the concrete model identifier used, alongside the existing role and provider."
+- "Given an evaluation whose MetaJudge made a model call, when usage is aggregated, then that call's tokens are included in the totals and attributed to the MetaJudge, not merged into an arbitrary judge."
+- "Given an evaluation, when the run manifest is written, then it carries per-judge, per-model and total token counts and a call count."
+- "Given no pricing configured, when an evaluation finishes, then token counts are reported and no cost figure is produced or implied."
+- "Given a pricing entry for every model used, when an evaluation finishes, then a cost per judge, per model and in total is reported in the configured currency, and the total equals the sum of its parts."
+- "Given pricing that covers some models but not others, when cost is computed, then the result is marked partial and names every model with no price, rather than treating an unpriced model as free."
+- "Given a provider response with no usage metadata, when usage is aggregated, then that call is counted and its tokens reported as unknown rather than as zero."
+- "Given an evaluation, when the console report is rendered, then it shows the models used and their token counts, and their cost when pricing makes one available."
+- "Given a pricing rate that is negative or not a number, when configuration is loaded, then it is rejected naming the offending model."
+test_plan:
+- 'Unit test: usage aggregation sums per judge, per model and in total, and its total equals the sum of its parts.'
+- 'Unit test: MetaJudge usage is counted once and attributed to the MetaJudge.'
+- 'Unit test: a judge result whose usage is empty is counted as a call with unknown tokens, not as zero tokens.'
+- 'Unit test: cost is computed from a pricing table at the configured per-million rates for input and output separately.'
+- 'Unit test: a model absent from the pricing table marks the summary partial and is named; priced models still report their cost.'
+- 'Unit test: with no pricing configured, the summary carries token counts and no cost.'
+- 'Unit test: a negative or non-numeric rate is rejected at configuration load, naming the model.'
+- 'Unit test: two judges sharing one model are aggregated under that model once, with their calls summed.'
+- 'Integration test: an evaluation end to end writes a usage summary into the run manifest and renders it on the console.'
+qa_notes: |
+  Cost is an estimate derived from operator-supplied rates and the token counts
+  the provider reported. It is not a billing record and must not be presented
+  as one; discounts, cache reads, batch tiers and rounding all live on the
+  provider's side. The figure is for comparing runs and budgeting, and the
+  reports say so.
+out_of_scope:
+- Fetching live prices from any provider; the table is operator-supplied and offline.
+- Bundling a default price list for any model, now or later.
+- Currency conversion; a table declares one currency and totals stay in it.
+- Billing reconciliation against a provider invoice.
+- Budget enforcement or aborting a run that exceeds a cost ceiling.
+- Cost accounting for the repair agent, whose token use belongs to the external tool that ran it.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - An evaluation whose judges run on three different models reports each model's tokens separately.
+  metrics: []
+technical_notes: |
+  Providers already normalise usage into input_tokens/output_tokens, so
+  aggregation reads one shape across Anthropic, OpenAI and Google. Cost is
+  computed once at aggregation time and frozen into the run manifest, so a run
+  re-read later shows the rates that were in force when it ran rather than
+  today's.
