@@ -61,6 +61,11 @@ Guidelines:
   `gpt-5.6-terra`, `gemini-3.1-pro`. The OpenSpec template's own spec-review and
   issue-autofix agents were moved off their stale ids too. The example-paper test no longer names the default
   ids, so bumping a model cannot break it (spec: veritas-core-evaluation-engine).
+- `veritas loop` silenced the evaluation engine's own progress, so an iteration went
+  fully quiet between "Iteration N / M" and the result — indistinguishable from a hang
+  against a real paper and a slow model. Both `veritas evaluate` and `veritas loop` now
+  show a spinner with a rotating verb per running judge or check
+  (spec: veritas-core-evaluation-engine).
 - A configured path resolving outside the artifact directory was reported with its
   absolute path, putting the user's home directory into every judge prompt and into the
   findings and repair plans built from them — where a path outside the workspace is one

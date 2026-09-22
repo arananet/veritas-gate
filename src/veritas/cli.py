@@ -541,7 +541,7 @@ def loop(
         raise _fail(str(exc)) from exc
 
     orchestrator = LoopOrchestrator(
-        Engine(workspace_config, loaded_profile, EngineOptions(progress=lambda *_: None)),
+        Engine(workspace_config, loaded_profile, EngineOptions(progress=reporter.engine_progress)),
         RepairPlanner(loaded_config.repair.permissions),
         agent_impl,
         loaded_config.loop,
