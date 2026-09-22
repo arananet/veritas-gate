@@ -51,6 +51,26 @@ class ConsoleReporter:
         self.console.print(f"Artifact: [bold]{artifact}[/bold]")
         self.console.print()
 
+    def truncation_warning(self, files: list[str], limit: int) -> None:
+        """Say when the judges were shown only part of a file.
+
+        A truncated manuscript means the judges reviewed a paper whose ending
+        they never read; that must never be a silent condition.
+        """
+        if self.quiet or not files:
+            return
+        self.console.print(
+            f"[yellow]warning:[/yellow] {len(files)} file(s) exceed "
+            f"{limit:,} characters and reach the judges truncated:"
+        )
+        for path in files:
+            self.console.print(f"  [yellow]![/yellow] {path}")
+        self.console.print(
+            "[dim]Raise artifact.max_file_chars, or split the file, "
+            "so nothing is judged unread.[/dim]"
+        )
+        self.console.print()
+
     def progress(self, phase: str, name: str, status: str) -> None:
         if self.quiet:
             return

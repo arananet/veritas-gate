@@ -20,26 +20,40 @@ WorkspaceMode = str  # "current" | "copy" | "worktree"
 
 @dataclass(slots=True)
 class Workspace:
-    """Where a repair iteration does its work."""
+    """Where a repair iteration does its work.
+
+    ``root`` is the artifact: paths from ``artifact.paths`` resolve against it.
+    ``top`` is the checkout that contains it, which differs from ``root`` when
+    the artifact is a subdirectory of a repository — a git worktree brings the
+    whole repository, so the artifact sits one or more levels down inside it.
+    Changes and patches are tracked from ``top``, so work the agent does outside
+    the artifact is still recorded rather than silently lost.
+    """
 
     root: Path
     original_commit: str | None = None
     mode: WorkspaceMode = "current"
     source: Path | None = None
+    top: Path | None = None
     _cleanup: list[Path] = field(default_factory=list, repr=False)
     _worktree_of: Path | None = field(default=None, repr=False)
 
     @property
+    def scan_root(self) -> Path:
+        return self.top or self.root
+
+    @property
     def is_git(self) -> bool:
-        return git_available() and _in_git_repo(self.root)
+        return git_available() and _in_git_repo(self.scan_root)
 
     def snapshot(self) -> dict[str, float]:
         """Record file mtimes and sizes, so changes can be detected without git."""
         state: dict[str, float] = {}
-        for path in sorted(self.root.rglob("*")):
+        base = self.scan_root
+        for path in sorted(base.rglob("*")):
             if not path.is_file():
                 continue
-            relative = path.relative_to(self.root)
+            relative = path.relative_to(base)
             # Relative parts only: a workspace under .veritas/workspaces/ would
             # otherwise skip every file it contains.
             if any(part in SKIP for part in relative.parts):
@@ -59,17 +73,17 @@ class Workspace:
         """A unified patch of the working tree, or an empty string without git."""
         if not self.is_git:
             return ""
-        result = _git(self.root, "diff", "HEAD")
+        result = _git(self.scan_root, "diff", "HEAD")
         if result is None:
             # No commit yet: show everything that is staged or untracked instead.
-            _git(self.root, "add", "-A", "-N")
-            result = _git(self.root, "diff")
+            _git(self.scan_root, "add", "-A", "-N")
+            result = _git(self.scan_root, "diff")
         return result or ""
 
     def head_commit(self) -> str | None:
         if not self.is_git:
             return None
-        return (_git(self.root, "rev-parse", "HEAD") or "").strip() or None
+        return (_git(self.scan_root, "rev-parse", "HEAD") or "").strip() or None
 
     def cleanup(self) -> None:
         """Remove temporary state. A copy workspace is kept when it holds changes."""
@@ -107,11 +121,15 @@ def open_workspace(
             shutil.rmtree(target, ignore_errors=True)
         created = _git(source, "worktree", "add", "--detach", str(target), original)
         if created is not None:
+            # A worktree checks out the whole repository. Point root back at the
+            # artifact's own directory inside it, or every configured path
+            # resolves to nothing.
             return Workspace(
-                root=target.resolve(),
+                root=(target / _repo_relative(source)).resolve(),
                 original_commit=original,
                 mode="worktree",
                 source=source,
+                top=target.resolve(),
                 _worktree_of=source,
             )
 
@@ -142,6 +160,17 @@ def git_available() -> bool:
 def _in_git_repo(path: Path) -> bool:
     result = _git(path, "rev-parse", "--is-inside-work-tree")
     return (result or "").strip() == "true"
+
+
+def _repo_relative(path: Path) -> Path:
+    """Where ``path`` sits inside its repository, or "." at the top."""
+    toplevel = (_git(path, "rev-parse", "--show-toplevel") or "").strip()
+    if not toplevel:
+        return Path()
+    try:
+        return path.resolve().relative_to(Path(toplevel).resolve())
+    except ValueError:  # pragma: no cover - defensive
+        return Path()
 
 
 def _head_commit(path: Path) -> str | None:

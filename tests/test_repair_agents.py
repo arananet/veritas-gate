@@ -309,3 +309,48 @@ def test_the_artifacts_own_veritas_directory_is_still_skipped(tmp_path: Path) ->
 
     artifact = Artifact(id="a", type="document", root=source, paths=["."])
     assert [segment.path for segment in artifact.segments()] == ["doc.md"]
+
+
+@pytest.mark.skipif(not git_available(), reason="git is not installed")
+def test_a_worktree_for_a_subdirectory_artifact_points_at_that_subdirectory(
+    tmp_path: Path,
+) -> None:
+    """Regression: a worktree checks out the whole repository.
+
+    With the artifact in `paper/`, the workspace root landed on the repository
+    root, so every configured path resolved to nothing and the judges would
+    have evaluated an empty artifact.
+    """
+    repo = tmp_path / "repo"
+    (repo / "paper" / "evidence").mkdir(parents=True)
+    (repo / "paper" / "manuscript.tex").write_text("\\documentclass{article}\n")
+    (repo / "paper" / "evidence" / "data.txt").write_text("measured\n")
+    (repo / "README.md").write_text("root\n")
+    for args in (
+        ["init", "-q"],
+        ["config", "user.email", "t@example.com"],
+        ["config", "user.name", "Test"],
+        ["add", "-A"],
+        ["commit", "-qm", "initial"],
+    ):
+        subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+
+    paper = repo / "paper"
+    workspace = open_workspace(paper, "worktree", loop_id="l1", base_dir=tmp_path / "ws")
+    if workspace.mode != "worktree":  # pragma: no cover - git too old
+        pytest.skip("git worktree unavailable")
+
+    assert (workspace.root / "manuscript.tex").is_file()
+    artifact = Artifact(
+        id="paper", type="document", root=workspace.root, paths=["manuscript.tex", "evidence"]
+    )
+    assert sorted(artifact.file_list()) == ["evidence/data.txt", "manuscript.tex"]
+
+    # Changes are still tracked from the repository root, so work the agent
+    # does outside the artifact is recorded rather than lost.
+    before = workspace.snapshot()
+    (workspace.root / "manuscript.tex").write_text("edited\n")
+    assert workspace.changed_since(before) == ["paper/manuscript.tex"]
+    assert "paper/manuscript.tex" in workspace.diff()
+    assert (paper / "manuscript.tex").read_text() == "\\documentclass{article}\n"
+    workspace.cleanup()

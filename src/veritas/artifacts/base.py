@@ -37,6 +37,8 @@ TEXT_SUFFIXES = {
     ".rb",
 }
 
+DEFAULT_MAX_FILE_CHARS = 400_000
+
 SKIP_DIRECTORIES = {
     ".git",
     ".veritas",
@@ -80,6 +82,10 @@ class Artifact:
     root: Path
     paths: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
+    # Per-file cap on what reaches a judge. Generous on purpose: truncating the
+    # manuscript means judging a paper by its first three quarters, and current
+    # models have the context for far more than this.
+    max_file_chars: int = DEFAULT_MAX_FILE_CHARS
     _segments: list[ArtifactSegment] | None = field(default=None, repr=False)
 
     def segments(self) -> list[ArtifactSegment]:
@@ -110,6 +116,12 @@ class Artifact:
 
     def file_list(self) -> list[str]:
         return [segment.path for segment in self.segments()]
+
+    def truncated_files(self) -> list[str]:
+        """Files the judges will only see part of."""
+        return [
+            segment.path for segment in self.segments() if len(segment.text) > self.max_file_chars
+        ]
 
     def commit_sha(self) -> str | None:
         """Return the artifact's git commit SHA when it lives in a repository."""

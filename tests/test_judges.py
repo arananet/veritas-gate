@@ -215,3 +215,36 @@ def test_large_files_are_truncated_inside_the_envelope(tmp_path: Path) -> None:
 def test_judge_response_schema_ignores_unexpected_fields() -> None:
     parsed = JudgeResponse.model_validate({"status": "pass", "nonsense": {"a": 1}})
     assert parsed.status == "pass"
+
+
+async def test_a_long_file_is_not_truncated_at_the_old_limit(
+    tmp_path: Path, serve, judge_payload, context
+) -> None:
+    """Regression: a 30k-character manuscript reached the judges cut at 24k.
+
+    Reviewing a paper whose last quarter was never sent is worse than not
+    reviewing it, because the verdict looks complete.
+    """
+    manuscript = "A" * 30_000 + "\nCONCLUSION MARKER\n"
+    artifact = make_artifact(tmp_path, manuscript)
+    assert artifact.truncated_files() == []
+
+    with serve(reply(judge_payload)) as server:
+        await judge_for(server.base_url).evaluate(artifact, context)
+        _, body, _ = server.requests[0]
+    assert "CONCLUSION MARKER" in body["messages"][1]["content"]
+
+
+async def test_the_configured_limit_is_honoured_and_reported(
+    tmp_path: Path, serve, judge_payload, context
+) -> None:
+    artifact = make_artifact(tmp_path, "B" * 5_000 + "TAIL")
+    artifact.max_file_chars = 1_000
+    assert artifact.truncated_files() == ["doc.md"]
+
+    with serve(reply(judge_payload)) as server:
+        await judge_for(server.base_url).evaluate(artifact, context)
+        _, body, _ = server.requests[0]
+    user = body["messages"][1]["content"]
+    assert "truncated at 1000 characters" in user
+    assert "TAIL" not in user
