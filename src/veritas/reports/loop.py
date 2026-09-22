@@ -12,7 +12,8 @@ from rich.text import Text
 from veritas.models.evaluation import EvaluationResult, GateResult
 from veritas.models.loop import STOP_REASON_TEXT, EvaluationDelta, LoopResult, StopReason
 from veritas.models.repair import RepairPlan, RepairResult
-from veritas.reports.console import GATE_STYLE, SEVERITY_STYLE
+from veritas.reports.console import GATE_STYLE, SEVERITY_STYLE, STATUS_MARK
+from veritas.reports.spinner import WorkSpinner
 
 STOP_STYLE: dict[StopReason, str] = {
     StopReason.QUALITY_GATE_REACHED: "bold green",
@@ -27,6 +28,8 @@ class LoopReporter:
     def __init__(self, console: Console | None = None, *, quiet: bool = False) -> None:
         self.console = console or Console()
         self.quiet = quiet
+        self._engine_phase: str | None = None
+        self._spinner = WorkSpinner(self.console)
 
     def header(self, profile: str, artifact: str, mode: str, max_iterations: int) -> None:
         if self.quiet:
@@ -39,6 +42,32 @@ class LoopReporter:
         self.console.print(f"Artifact: [bold]{artifact}[/bold]")
         self.console.print(f"Budget:   up to {max_iterations} iteration(s)")
         self.console.print()
+
+    def engine_progress(self, phase: str, name: str, status: str) -> None:
+        """Relay the evaluation engine's own per-judge/check progress.
+
+        Without this, an iteration goes silent for however long the judges
+        take -- a minute or more against a real paper -- which is
+        indistinguishable from a hang.
+        """
+        if self.quiet:
+            return
+        if phase != self._engine_phase:
+            self._spinner.stop()
+            self._engine_phase = phase
+            heading = {
+                "check": "  Running deterministic checks...",
+                "judge": "  Running judges...",
+                "claims": "  Building claim graph...",
+                "meta": "  Meta review...",
+            }.get(phase, f"  {phase}...")
+            self.console.print(heading)
+            self._spinner.start()
+        if status == "start":
+            self._spinner.mark_running(name)
+            return
+        mark, style = STATUS_MARK.get(status, ("  ", ""))
+        self._spinner.mark_done(name, f"    [{style}]{mark}[/{style}]{name}")
 
     def progress(self, event: str, payload: dict[str, Any]) -> None:
         if self.quiet:
@@ -57,6 +86,8 @@ class LoopReporter:
     # ------------------------------------------------------------- events
 
     def _iteration(self, payload: dict[str, Any]) -> None:
+        self._spinner.stop()
+        self._engine_phase = None
         self.console.rule(
             f"[bold]Iteration {payload['iteration']} / {payload['total']}[/bold]",
             style="dim",
@@ -111,6 +142,7 @@ class LoopReporter:
     # ------------------------------------------------------------ summary
 
     def summary(self, result: LoopResult) -> None:
+        self._spinner.stop()
         if self.quiet:
             self.console.print(result.stop_reason.value)
             return

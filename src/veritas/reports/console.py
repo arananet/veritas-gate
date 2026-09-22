@@ -9,6 +9,7 @@ from rich.text import Text
 
 from veritas.models.evaluation import EvaluationResult, GateResult
 from veritas.models.finding import Finding, severity_rank
+from veritas.reports.spinner import WorkSpinner
 
 SEVERITY_STYLE = {
     "critical": "bold red",
@@ -39,6 +40,7 @@ class ConsoleReporter:
         self.console = console or Console()
         self.quiet = quiet
         self._phase: str | None = None
+        self._spinner = WorkSpinner(self.console)
 
     def header(self, profile: str, artifact: str) -> None:
         if self.quiet:
@@ -49,6 +51,29 @@ class ConsoleReporter:
         self.console.print()
         self.console.print(f"Profile:  [bold]{profile}[/bold]")
         self.console.print(f"Artifact: [bold]{artifact}[/bold]")
+        self.console.print()
+
+    def external_paths_warning(self, paths: list[str], mode: str) -> None:
+        """Say when configured paths reach outside the artifact directory.
+
+        They are evaluated fine, but a repair workspace that copies only the
+        artifact directory will not contain them, so the loop would repair an
+        incomplete tree.
+        """
+        if self.quiet or not paths:
+            return
+        self.console.print(
+            f"[yellow]note:[/yellow] {len(paths)} configured path(s) resolve outside "
+            "the artifact directory:"
+        )
+        for path in paths:
+            self.console.print(f"  [yellow]·[/yellow] {path}")
+        if mode in ("copy", "snapshot"):
+            self.console.print(
+                f"[yellow]workspace.mode is '{mode}', which copies only the artifact "
+                "directory, so `veritas loop` would not see these. Use 'worktree', or "
+                "run from the directory that contains them.[/yellow]"
+            )
         self.console.print()
 
     def truncation_warning(self, files: list[str], limit: int) -> None:
@@ -78,6 +103,7 @@ class ConsoleReporter:
             # The gate gets its own panel in summary(); no progress line for it.
             return
         if phase != self._phase:
+            self._spinner.stop()
             self._phase = phase
             heading = {
                 "check": "Running deterministic checks...",
@@ -86,12 +112,15 @@ class ConsoleReporter:
                 "meta": "Meta review...",
             }.get(phase, phase)
             self.console.print(heading)
+            self._spinner.start()
         if status == "start":
+            self._spinner.mark_running(name)
             return
         mark, style = STATUS_MARK.get(status, ("  ", ""))
-        self.console.print(f"  [{style}]{mark}[/{style}]{name}")
+        self._spinner.mark_done(name, f"  [{style}]{mark}[/{style}]{name}")
 
     def summary(self, result: EvaluationResult) -> None:
+        self._spinner.stop()
         if self.quiet:
             self.console.print(result.gate.status)
             return

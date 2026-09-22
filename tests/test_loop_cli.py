@@ -272,3 +272,16 @@ def test_loop_can_be_disabled_in_configuration(tmp_path: Path, serve, repo_root)
 def _latest_loop(project: Path) -> Path:
     base = project / ".veritas" / "loops"
     return base / (base / "latest").read_text().strip()
+
+
+def test_the_loop_prints_per_judge_progress_not_silence(tmp_path: Path, serve, repo_root) -> None:
+    """Regression: an iteration went silent for however long the judges took,
+    indistinguishable from a hang against a real, slow evaluation."""
+    with serve(sequencing([CLEAN])) as server:
+        project = write_project(tmp_path, server.base_url, repo_root)
+        result = runner.invoke(app, ["loop", str(project)])
+
+    assert result.exit_code == 0, result.stdout
+    assert "Running judges" in result.stdout
+    for judge in ("structure", "evidence", "adversarial"):
+        assert judge in result.stdout

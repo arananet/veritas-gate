@@ -135,3 +135,35 @@ def test_the_example_projects_resolve_their_own_profile(repo_root: Path) -> None
         profile = load_profile(config.profile, config.root, config.profile_paths)
         assert profile.name == expected
         assert profile.definition.judges
+
+
+def test_paths_outside_the_artifact_are_relative_not_absolute(tmp_path: Path) -> None:
+    """Regression: they arrived as absolute paths, home directory included.
+
+    An absolute location travels into judge prompts, findings and repair plans
+    — and a path outside the workspace is one a repair agent could write to.
+    """
+    from veritas.artifacts import Artifact
+
+    (tmp_path / "paper").mkdir()
+    (tmp_path / "src").mkdir()
+    (tmp_path / "paper" / "manuscript.md").write_text("# Paper\n")
+    (tmp_path / "src" / "adapter.ts").write_text("export const x = 1;\n")
+
+    artifact = Artifact(
+        id="paper",
+        type="document",
+        root=tmp_path / "paper",
+        paths=["manuscript.md", "../src"],
+    )
+    assert sorted(artifact.file_list()) == ["../src/adapter.ts", "manuscript.md"]
+    assert str(tmp_path) not in " ".join(artifact.file_list())
+    assert artifact.external_paths() == ["../src"]
+
+
+def test_an_artifact_wholly_inside_its_root_reports_no_external_paths(tmp_path: Path) -> None:
+    from veritas.artifacts import Artifact
+
+    (tmp_path / "doc.md").write_text("x\n")
+    artifact = Artifact(id="a", type="document", root=tmp_path, paths=["doc.md"])
+    assert artifact.external_paths() == []

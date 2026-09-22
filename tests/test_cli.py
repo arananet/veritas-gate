@@ -261,3 +261,25 @@ def test_files_says_so_when_nothing_matches(tmp_path: Path, repo_root) -> None:
     result = runner.invoke(app, ["files", str(project)])
     assert result.exit_code == 0
     assert "No readable files matched" in result.stdout
+
+
+def test_the_console_never_goes_silent_while_judges_run(
+    tmp_path: Path, serve, judge_payload, repo_root
+) -> None:
+    """Regression: between a judge starting and finishing there was nothing
+    printed at all, indistinguishable from a hang against a slow model."""
+    from veritas.reports.console import ConsoleReporter
+
+    events: list[tuple[str, str, str]] = []
+    reporter = ConsoleReporter()
+    original = reporter.progress
+
+    def spy(phase: str, name: str, status: str) -> None:
+        events.append((phase, name, status))
+        original(phase, name, status)
+
+    reporter.progress = spy  # type: ignore[method-assign]
+    reporter.progress("judge", "evidence", "start")
+    reporter.progress("judge", "evidence", "ok")
+    assert ("judge", "evidence", "start") in events
+    assert reporter._spinner._running == {}
