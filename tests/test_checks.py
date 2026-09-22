@@ -126,3 +126,106 @@ async def test_check_with_nothing_configured_is_skipped(tmp_path: Path) -> None:
     result = await check.run(artifact_at(tmp_path))
     assert result.status == "skipped"
     assert result.passed
+
+
+# ------------------------------------------------------- content patterns
+
+
+def patterns_check(tmp_path: Path, **config):
+    return build_check(
+        "archival", CheckConfig(type="content-patterns", **config), ExecutionConfig()
+    )
+
+
+async def test_a_missing_required_pattern_is_reported(tmp_path: Path) -> None:
+    (tmp_path / "paper.md").write_text("# Paper\n\nNo identifier here.\n")
+    check = patterns_check(
+        tmp_path,
+        target="paper.md",
+        required_patterns=[{"pattern": r"10\.\d{4,}/", "description": "a DOI"}],
+    )
+    result = await check.run(artifact_at(tmp_path))
+
+    assert result.status == "fail"
+    assert result.findings[0].title == "Missing from the artifact: a DOI"
+    assert result.findings[0].recommendation == "Add a DOI."
+
+
+async def test_a_present_required_pattern_passes(tmp_path: Path) -> None:
+    (tmp_path / "paper.md").write_text("Archived at 10.5281/zenodo.22884173\n")
+    check = patterns_check(
+        tmp_path,
+        target="paper.md",
+        required_patterns=[{"pattern": r"10\.\d{4,}/", "description": "a DOI"}],
+    )
+    result = await check.run(artifact_at(tmp_path))
+    assert result.status == "pass"
+    assert result.findings == []
+
+
+async def test_a_forbidden_pattern_is_quoted_with_its_line(tmp_path: Path) -> None:
+    """A citation to a mutable branch will rot; the reader needs to know where."""
+    (tmp_path / "paper.md").write_text(
+        "# Paper\n\nSee https://github.com/a/b/blob/main/src.ts for the code.\nEnd.\n"
+    )
+    check = patterns_check(
+        tmp_path,
+        target="paper.md",
+        forbidden_patterns=[
+            {
+                "pattern": r"github\.com/\S+/blob/(main|master)/",
+                "description": "a mutable branch link",
+            }
+        ],
+    )
+    result = await check.run(artifact_at(tmp_path))
+
+    assert result.status == "fail"
+    finding = result.findings[0]
+    assert finding.title == "Present in the artifact: a mutable branch link"
+    assert finding.evidence[0].startswith("line 3:")
+    assert "blob/main" in finding.evidence[0]
+
+
+async def test_matching_is_case_insensitive_unless_configured(tmp_path: Path) -> None:
+    (tmp_path / "paper.md").write_text("DATA AVAILABILITY: on request.\n")
+    insensitive = patterns_check(
+        tmp_path, target="paper.md", required_patterns=[{"pattern": "data availability"}]
+    )
+    assert (await insensitive.run(artifact_at(tmp_path))).status == "pass"
+
+    sensitive = patterns_check(
+        tmp_path,
+        target="paper.md",
+        case_sensitive=True,
+        required_patterns=[{"pattern": "data availability"}],
+    )
+    assert (await sensitive.run(artifact_at(tmp_path))).status == "fail"
+
+
+async def test_an_unreadable_target_is_an_error_not_a_pass(tmp_path: Path) -> None:
+    """A check that could not run must never be read as a check that passed."""
+    (tmp_path / "other.md").write_text("x")
+    check = patterns_check(
+        tmp_path, target="absent.md", required_patterns=[{"pattern": "anything"}]
+    )
+    result = await check.run(artifact_at(tmp_path))
+
+    assert result.status == "error"
+    assert not result.passed
+    assert "could not be checked" in result.findings[0].description
+
+
+async def test_a_check_with_no_patterns_is_skipped(tmp_path: Path) -> None:
+    (tmp_path / "paper.md").write_text("x")
+    result = await patterns_check(tmp_path, target="paper.md").run(artifact_at(tmp_path))
+    assert result.status == "skipped"
+    assert result.passed
+
+
+def test_an_invalid_regular_expression_is_rejected_at_configuration_time() -> None:
+    """Better a config error than a crash in the middle of a paid run."""
+    import pytest
+
+    with pytest.raises(ValueError, match="invalid regular expression"):
+        CheckConfig(type="content-patterns", required_patterns=[{"pattern": "[unclosed"}])

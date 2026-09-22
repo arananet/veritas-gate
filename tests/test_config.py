@@ -70,6 +70,7 @@ def test_scientific_paper_profile_defines_its_judges(repo_root: Path) -> None:
         "reproducibility",
         "repo-consistency",
         "citations",
+        "archival",
         "adversarial",
     ]
     for spec in profile.definition.judges:
@@ -167,3 +168,35 @@ def test_an_artifact_wholly_inside_its_root_reports_no_external_paths(tmp_path: 
     (tmp_path / "doc.md").write_text("x\n")
     artifact = Artifact(id="a", type="document", root=tmp_path, paths=["doc.md"])
     assert artifact.external_paths() == []
+
+
+def test_the_scientific_paper_profile_declares_the_archival_judge(repo_root: Path) -> None:
+    profile = load_profile("scientific-paper", repo_root)
+    spec = next(item for item in profile.definition.judges if item.name == "archival")
+    prompt = profile.prompt_for(spec)
+
+    for topic in ("DOI", "licence", "CITATION.cff", "preregistration", "mutable"):
+        assert topic.lower() in prompt.lower(), f"the archival prompt should cover {topic}"
+
+
+def test_the_shipped_citability_patterns_tell_pinned_from_mutable(repo_root: Path) -> None:
+    """A link to a branch can change after review; a commit or tag cannot."""
+    import re
+
+    check = load_profile("scientific-paper", repo_root).definition.checks["citability"]
+    forbidden = check.forbidden_patterns[0].pattern
+
+    assert re.search(forbidden, "https://github.com/a/b/blob/main/src.ts", re.IGNORECASE)
+    assert re.search(forbidden, "https://gitlab.com/x/y/tree/master/lib", re.IGNORECASE)
+    assert not re.search(forbidden, "https://github.com/a/b/blob/a1b2c3d4/src.ts", re.IGNORECASE)
+    assert not re.search(forbidden, "https://github.com/a/b/tree/v1.2.0/src", re.IGNORECASE)
+
+    doi = check.required_patterns[0].pattern
+    assert re.search(doi, "https://doi.org/10.5281/zenodo.22884173")
+    assert not re.search(doi, "See the repository for details.")
+
+
+def test_the_citability_check_ships_disabled(repo_root: Path) -> None:
+    """These are conventions, not universal requirements: opting in is the user's call."""
+    check = load_profile("scientific-paper", repo_root).definition.checks["citability"]
+    assert check.enabled is False

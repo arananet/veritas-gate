@@ -4,16 +4,21 @@ from __future__ import annotations
 
 from veritas.checks.base import Check, check_finding
 from veritas.checks.command import CommandCheck, CommandNotAllowedError
-from veritas.checks.structure import RequiredPathsCheck, RequiredSectionsCheck
+from veritas.checks.structure import (
+    ContentPatternsCheck,
+    RequiredPathsCheck,
+    RequiredSectionsCheck,
+)
 from veritas.config import CheckConfig, ConfigError, ExecutionConfig
 
-CHECK_TYPES = ("command", "required-paths", "required-sections")
+CHECK_TYPES = ("command", "required-paths", "required-sections", "content-patterns")
 
 __all__ = [
     "CHECK_TYPES",
     "Check",
     "CommandCheck",
     "CommandNotAllowedError",
+    "ContentPatternsCheck",
     "RequiredPathsCheck",
     "RequiredSectionsCheck",
     "build_check",
@@ -29,6 +34,8 @@ def build_check(name: str, config: CheckConfig, execution: ExecutionConfig) -> C
         return RequiredPathsCheck(name, config)
     if config.type == "required-sections":
         return RequiredSectionsCheck(name, config)
+    if config.type == "content-patterns":
+        return ContentPatternsCheck(name, config)
     raise ConfigError(
         f"check '{name}' has unknown type '{config.type}'; known types: {', '.join(CHECK_TYPES)}"
     )

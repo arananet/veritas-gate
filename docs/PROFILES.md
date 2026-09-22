@@ -56,6 +56,39 @@ gate:
 Judges are declarative. There is no Python subclass to write: `LLMJudge` is
 instantiated from the prompt file and the model role.
 
+## Check types
+
+| Type | What it asserts | Runs a subprocess |
+| --- | --- | --- |
+| `required-paths` | Configured paths exist in the artifact | no |
+| `required-sections` | A target document contains configured sections | no |
+| `content-patterns` | A target's text matches (or avoids) regular expressions | no |
+| `command` | An allow-listed command exits zero | yes |
+
+`content-patterns` is the cheap half of archival review — whether a manuscript
+names a DOI, cites a commit rather than a branch, or has a data availability
+statement at all:
+
+```yaml
+checks:
+  citability:
+    type: content-patterns
+    target: paper/manuscript.md
+    severity_on_failure: minor
+    case_sensitive: false
+    required_patterns:
+      - pattern: '10\.\d{4,}/'
+        description: a DOI for the archived work
+    forbidden_patterns:
+      - pattern: '(?i)github\.com/\S+/(blob|tree)/(main|master)/'
+        description: a link to a mutable branch instead of a pinned commit
+```
+
+Invalid regular expressions are rejected when the configuration loads, not
+part-way through a paid run. A forbidden match quotes the line it found, so the
+finding says where and not only that. A target that cannot be read reports an
+error rather than passing: a check that could not run is not a check that passed.
+
 ## Prompts
 
 Each prompt is the judge's system instructions. Veritas prepends the security

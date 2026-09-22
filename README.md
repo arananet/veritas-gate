@@ -425,7 +425,7 @@ packages — so `veritas-security` or `veritas-arxiv` can ship profiles of their
 own without forking this repository.
 
 Shipped today: `scientific-paper` (methodology, evidence, statistics,
-reproducibility, repo-consistency, citations, adversarial) and
+reproducibility, repo-consistency, citations, archival, adversarial) and
 `generic-document` (structure, evidence, adversarial).
 
 ---

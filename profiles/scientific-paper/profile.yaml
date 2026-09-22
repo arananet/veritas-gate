@@ -49,6 +49,12 @@ judges:
     version: "1"
     description: Whether references exist, are well formed, and support their claims.
 
+  - name: archival
+    prompt: archival.md
+    model_role: archival
+    version: "1"
+    description: Whether the work can be found, cited and retrieved, and whether what it cites will hold.
+
   - name: adversarial
     prompt: adversarial.md
     model_role: adversarial
@@ -72,6 +78,23 @@ checks:
       - method
       - results
       - conclusion
+
+  # Off by default: these are conventions, not universal requirements, and a
+  # profile should not fail a paper for a convention its venue does not hold.
+  # Enable in your veritas.yaml and set `target` to your manuscript.
+  citability:
+    type: content-patterns
+    enabled: false
+    severity_on_failure: minor
+    target: null
+    required_patterns:
+      - pattern: '10\.\d{4,}/'
+        description: a DOI for the archived work
+      - pattern: '(?i)data availability|availability statement'
+        description: a data availability statement
+    forbidden_patterns:
+      - pattern: '(?i)(github|gitlab)\.com/\S+/(blob|tree)/(main|master)/'
+        description: a link to a mutable branch instead of a pinned commit or tag
 
 gate:
   fail_on:
