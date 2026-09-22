@@ -429,7 +429,9 @@ async def test_mechanical_findings_are_repaired_before_stopping_for_a_human(
     dispatched = [action for plan in agent.seen_plans for action in plan.actions]
     # ...and the human-blocked action was still never dispatched.
     assert all(not action.requires_human_approval for action in dispatched)
-    assert "repaired first" in result.stop_detail
+    # The message reports what changed on disk, never the count dispatched:
+    # an agent can run and repair nothing, and did, before this was fixed.
+    assert "decision(s) remain for a human" in result.stop_detail
 
 
 async def test_stop_mode_preserves_the_previous_behaviour(tmp_path: Path) -> None:

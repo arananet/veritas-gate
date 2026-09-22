@@ -306,8 +306,10 @@ class LoopOrchestrator:
 
             if human:
                 # The mechanical work is done; now ask, against a cleaner artifact.
+                # Report the files that actually changed, never the count of
+                # actions dispatched: an agent can run and repair nothing.
                 stop = StopReason.HUMAN_DECISION_REQUIRED
-                detail = _human_detail(human, repaired=len(plan.autonomous_actions))
+                detail = _human_detail(human, changed=len(observed))
                 result.iterations.append(_finish(record, self.options.now()))
                 break
 
@@ -374,13 +376,11 @@ def _empty_gate() -> GateResult:
     return GateResult(status="FAIL")
 
 
-def _human_detail(actions: list[RepairAction], repaired: int = 0) -> str:
+def _human_detail(actions: list[RepairAction], changed: int | None = None) -> str:
     lines = []
-    if repaired:
-        lines.append(
-            f"{repaired} autonomous action(s) were repaired first; "
-            f"{len(actions)} decision(s) remain for a human:"
-        )
+    if changed is not None:
+        did = f"{changed} file(s) were changed first" if changed else "no file was changed"
+        lines.append(f"{did}; {len(actions)} decision(s) remain for a human:")
     for action in actions:
         findings = ", ".join(action.finding_ids)
         reason = action.blocked_reason or "requires a human decision"

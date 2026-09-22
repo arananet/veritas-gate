@@ -354,3 +354,57 @@ def test_a_worktree_for_a_subdirectory_artifact_points_at_that_subdirectory(
     assert "paper/manuscript.tex" in workspace.diff()
     assert (paper / "manuscript.tex").read_text() == "\\documentclass{article}\n"
     workspace.cleanup()
+
+
+# ------------------------------------------- a no-op repair is a failure
+
+
+async def test_an_agent_that_changes_nothing_is_a_failure(tmp_path: Path) -> None:
+    """A misconfigured command exits zero and does nothing.
+
+    That used to be recorded as `partial`, the loop carried straight past it,
+    and the run claimed to have repaired actions never carried out.
+    """
+    workspace = temporary_workspace(_artifact_dir(tmp_path))
+    agent = GenericCLIRepairAgent(
+        RepairAgentConfig(command=[sys.executable, "-c", "pass"], timeout=60),
+        RepairPermissions(),
+    )
+    artifact = Artifact(id="a", type="document", root=workspace.root, paths=["doc.md"])
+
+    result = await agent.repair(artifact, plan_with(), workspace)
+
+    assert result.status == "failed"
+    assert result.changes == []
+    assert any("changed no file" in note for note in result.notes)
+    # The command is named, so the operator can see what to fix.
+    assert any(sys.executable in note for note in result.notes)
+    workspace.cleanup()
+
+
+async def test_an_agent_claiming_success_without_changing_a_file_is_a_failure(
+    tmp_path: Path,
+) -> None:
+    """The changed-file list comes from disk, never from the agent's claim."""
+    script = tmp_path / "liar.py"
+    script.write_text(
+        "import json, sys\n"
+        "open(sys.argv[2], 'w').write(json.dumps({\n"
+        "  'action_ids': ['A-1'], 'status': 'completed',\n"
+        "  'changes': [{'file': 'doc.md', 'description': 'I definitely did this'}]\n"
+        "}))\n"
+    )
+    workspace = temporary_workspace(_artifact_dir(tmp_path))
+    agent = GenericCLIRepairAgent(
+        RepairAgentConfig(
+            command=[sys.executable, str(script), "{prompt_file}", "{result_file}"], timeout=60
+        ),
+        RepairPermissions(),
+    )
+    artifact = Artifact(id="a", type="document", root=workspace.root, paths=["doc.md"])
+
+    result = await agent.repair(artifact, plan_with(), workspace)
+
+    assert result.status == "failed"
+    assert any("changed no file" in note for note in result.notes)
+    workspace.cleanup()
