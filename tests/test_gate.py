@@ -156,7 +156,8 @@ def test_an_accepted_risk_stops_blocking_but_is_still_counted() -> None:
     assert result.major == 1, "the finding is still counted"
     assert result.blocking_findings == []
     assert result.accepted_risks == [issue_key(item)]
-    assert any("accepted as known risk" in reason for reason in result.reasons)
+    assert result.accepted_findings == ["REPRO-001"]
+    assert any("1 rule(s) accepted 1 finding(s)" in reason for reason in result.reasons)
 
 
 def test_accepting_one_risk_does_not_excuse_another() -> None:
@@ -237,3 +238,107 @@ def test_the_stable_id_survives_rewording_and_renumbering() -> None:
     first = evidenced("EVIDENCE-001", "major", "Manuscript is git-ignored")
     later = evidenced("REPRO-007", "critical", "git-ignored is the Manuscript")
     assert issue_key(first) == issue_key(later)
+
+
+def test_a_risk_can_be_accepted_by_category_and_location() -> None:
+    """The id is derived from the title, so a judge rewording the same problem
+    after the artifact changes produces a new id. category/location survive it."""
+    before = Finding(
+        id="A-1",
+        severity="major",
+        category="reproducibility",
+        title="Reproducibility undermined by locally .gitignored manuscript",
+        description="d",
+        location="paper/REPRODUCTION.md, 'Inputs and prerequisites'",
+        evidence=["e"],
+    )
+    after = Finding(
+        id="B-1",
+        severity="major",
+        category="reproducibility",
+        title="The reported study is not independently reproducible from the artifact",
+        description="d",
+        location="paper/manuscript.md; paper/REPRODUCTION.md, 'Commands'",
+        evidence=["e"],
+    )
+    from veritas.models.finding import issue_key
+
+    assert issue_key(before) != issue_key(after), "the ids do differ; that is the problem"
+
+    policy = GatePolicy(
+        max_major=0,
+        accepted_risks=[
+            {
+                "category": "reproducibility",
+                "location": "paper/REPRODUCTION.md",
+                "reason": "Pre-publication, by choice.",
+            }
+        ],
+    )
+    for finding in (before, after):
+        result = evaluate_gate([finding], [], policy)
+        assert result.status == "PASS", f"{finding.id} should be covered by the same rule"
+        assert result.accepted_risks == ["category=reproducibility location=paper/REPRODUCTION.md"]
+
+
+def test_a_broad_rule_reports_every_finding_it_covers() -> None:
+    """A blanket exemption whose reach is invisible is how a gate stops meaning
+    anything, so the covered findings are always named."""
+    findings = [
+        Finding(
+            id=f"A-{index}",
+            severity="major",
+            category="reproducibility",
+            title=f"Problem number {index}",
+            description="d",
+            location="paper/REPRODUCTION.md",
+            evidence=["e"],
+        )
+        for index in range(3)
+    ]
+    policy = GatePolicy(
+        max_major=0,
+        accepted_risks=[{"category": "reproducibility", "reason": "All pre-publication."}],
+    )
+    result = evaluate_gate(findings, [], policy)
+
+    assert result.status == "PASS"
+    assert result.major == 3, "still counted"
+    assert result.accepted_findings == ["A-0", "A-1", "A-2"]
+    assert any("accepted 3 finding(s)" in reason for reason in result.reasons)
+
+
+def test_a_category_rule_does_not_reach_another_category() -> None:
+    covered = Finding(
+        id="A-1",
+        severity="major",
+        category="reproducibility",
+        title="t",
+        description="d",
+        location="paper/REPRODUCTION.md",
+        evidence=["e"],
+    )
+    other = Finding(
+        id="A-2",
+        severity="major",
+        category="evidence",
+        title="t",
+        description="d",
+        location="paper/REPRODUCTION.md",
+        evidence=["e"],
+    )
+    policy = GatePolicy(
+        max_major=0,
+        accepted_risks=[{"category": "reproducibility", "reason": "Pre-publication."}],
+    )
+    result = evaluate_gate([covered, other], [], policy)
+    assert result.status == "REVISE"
+    assert result.blocking_findings == ["A-2"]
+
+
+def test_a_rule_with_no_criteria_is_rejected_outright() -> None:
+    """It would accept every finding, which is not an exception but an off switch."""
+    import pytest
+
+    with pytest.raises(ValueError, match="needs an id, a category or a location"):
+        GatePolicy(accepted_risks=[{"reason": "everything is fine"}])
