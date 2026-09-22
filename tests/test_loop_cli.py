@@ -285,3 +285,48 @@ def test_the_loop_prints_per_judge_progress_not_silence(tmp_path: Path, serve, r
     assert "Running judges" in result.stdout
     for judge in ("structure", "evidence", "adversarial"):
         assert judge in result.stdout
+
+
+def test_an_incomplete_repair_shows_the_agent_reasons() -> None:
+    """A column of bare "!" marks was the only account of a partial repair."""
+    from rich.console import Console
+
+    from veritas.models.repair import RepairResult
+    from veritas.reports.loop import LoopReporter
+
+    console = Console(width=100, record=True)
+    reporter = LoopReporter(console)
+    reporter._repaired(
+        {
+            "repair": RepairResult(
+                action_ids=["ACTION-001", "ACTION-002"],
+                status="partial",
+                notes=["Human intervention is required for ACTION-002: no such evidence exists."],
+            ),
+            "changed": ["paper/manuscript.md"],
+        }
+    )
+    output = console.export_text()
+    assert "partial" in output
+    assert "no such evidence exists" in output
+
+
+def test_a_completed_repair_prints_no_reasons() -> None:
+    from rich.console import Console
+
+    from veritas.models.repair import RepairResult
+    from veritas.reports.loop import LoopReporter
+
+    console = Console(width=100, record=True)
+    reporter = LoopReporter(console)
+    reporter._repaired(
+        {
+            "repair": RepairResult(
+                action_ids=["ACTION-001"], status="completed", notes=["all done"]
+            ),
+            "changed": ["doc.md"],
+        }
+    )
+    output = console.export_text()
+    assert "all done" not in output
+    assert "✓" in output

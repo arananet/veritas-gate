@@ -169,6 +169,14 @@ class LoopReporter:
         changed = payload.get("changed") or []
         if changed:
             self.console.print(f"  [dim]{len(changed)} file(s) changed[/dim]")
+        # An agent that declined actions usually says why. Those notes were
+        # written to disk and never shown, leaving a column of bare "!" marks
+        # as the only account of what happened.
+        if repair.status != "completed" and repair.notes:
+            self.console.print()
+            self.console.print(f"  [yellow]The agent reported status '{repair.status}':[/yellow]")
+            for note in repair.notes:
+                self.console.print(f"    [dim]· {_escape(note)}[/dim]")
         self.console.print()
 
     def _delta(self, payload: dict[str, Any]) -> None:

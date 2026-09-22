@@ -33,6 +33,8 @@ acceptance_criteria:
 - "Given a repair that exceeds its timeout, when it is killed, then the output captured up to that point is retained in the result."
 - "Given any configured agent command, when its output is streamed, then no parsing specific to a particular vendor's format is applied."
 - "Given the captured output, when the result is recorded, then it is still bounded to the existing limit so a chatty agent cannot fill the run directory."
+- "Given a repair whose status is not completed, when it is reported, then the agent's own notes are printed under that status, because an agent that declines actions explains itself and that account was written to disk and never shown."
+- "Given a repair that completed, when it is reported, then no notes block is printed."
 test_plan:
 - 'Unit test: an agent writing several lines delivers them to the callback in order, before the process exits.'
 - 'Unit test: the captured output in the result matches what was streamed.'
@@ -41,6 +43,7 @@ test_plan:
 - 'Unit test: a timed-out agent retains the output seen so far in its failure result.'
 - 'Unit test: a non-UTF-8 byte in the output does not raise.'
 - 'Integration test: a loop run prints the agent lines it received.'
+- 'Unit test: an incomplete repair prints the agent notes; a completed one does not.'
 qa_notes: |
   The transcript can contain whatever the agent chose to print, including file
   contents from the workspace. It is shown in a terminal the operator already
@@ -60,3 +63,6 @@ technical_notes: |
   Reading stdout line by line replaces `communicate()`, so the timeout wraps the
   reader rather than the whole call. Decoding stays lenient, since an agent may
   emit progress characters that are not valid UTF-8 mid-line.
+
+  A declined action is not a failure: the notes explaining it are the
+  operator's only account of what the agent would not do and why.
