@@ -79,7 +79,9 @@ Running judges...
   ✗ reproducibility
   ✗ repo-consistency
   ! citations
+  ✗ archival
   ✗ adversarial
+⠹ Cross-examining adversarial, Weighing archival...
 Building claim graph...
   ✓ claim graph
 Meta review...
@@ -441,12 +443,16 @@ version: 1
 profile: scientific-paper
 
 artifact:
+  # Every file here is sent to every judge, so this decides what a run costs.
+  # Check it with `veritas files .` before the first run on a real project.
   paths: [paper, experiments, results, scripts]
+  max_file_chars: 400000            # per file; anything longer is truncated, and said so
 
 models:
   default:
     provider: ${VERITAS_DEFAULT_PROVIDER:-anthropic}
     model: ${VERITAS_DEFAULT_MODEL}
+    tls_verify: ${VERITAS_TLS_VERIFY:-true}   # `truststore` behind a TLS-intercepting proxy
   adversarial:                      # a different vendor, on purpose
     provider: openai
     model: ${VERITAS_ADVERSARIAL_MODEL}
@@ -459,6 +465,11 @@ gate:
   max_major: 0
   max_minor: 20
   require_checks: [tests]
+  accepted_risks:                   # known problems carried on the record
+    - category: reproducibility
+      location: paper/REPRODUCTION.md
+      reason: "Pre-publication: files stay private until submission."
+      expires: 2026-12-31
 
 checks:
   tests:
@@ -468,6 +479,19 @@ checks:
 execution:
   allow: [pytest]                   # nothing runs unless it is listed here
 ```
+
+Four check types, three of which run nothing:
+
+| Type | What it asserts | Runs a subprocess |
+| --- | --- | --- |
+| `required-paths` | Configured paths exist in the artifact | no |
+| `required-sections` | A target document contains configured sections | no |
+| `content-patterns` | A target's text matches, or avoids, regular expressions | no |
+| `command` | An allow-listed command exits zero | yes |
+
+`content-patterns` is how a profile asserts what a regular expression can
+settle — that a manuscript names a DOI, or cites a commit rather than a branch
+that will move. See [`docs/PROFILES.md`](docs/PROFILES.md).
 
 Model ids are never hard-coded. Copy `.env.example`, choose your models, and
 point each judge role at whichever provider you want. The adversarial reviewer
@@ -634,8 +658,13 @@ and [`CONTRIBUTING.md`](CONTRIBUTING.md) for the contributor checklist.
 
 ## Status
 
-v0.1 plus the bounded repair loop. Not implemented, by design: a web UI, and
-automatic GitHub PR creation. The CLI comes first.
+v0.1 plus the bounded repair loop, run against real papers and hardened by what
+that found. Not implemented, by design: a web UI, and automatic GitHub PR
+creation. The CLI comes first.
+
+Reading is text-only: Markdown, LaTeX, BibTeX, source and data files. PDFs and
+other binaries are skipped, so convert a PDF-only manuscript before evaluating
+it — `veritas files .` shows exactly what the judges will read.
 
 ---
 
