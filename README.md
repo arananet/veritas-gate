@@ -1,6 +1,6 @@
 # Veritas Gate
 
-![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white) ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?logo=githubactions&logoColor=white) ![OpenSpec](https://img.shields.io/badge/OpenSpec-enforced-blueviolet) ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white) ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?logo=githubactions&logoColor=white) ![OpenSpec](https://img.shields.io/badge/OpenSpec-enforced-blueviolet) ![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)
 
 > **Trust, but verify.**
 
@@ -601,7 +601,8 @@ automatic GitHub PR creation. The CLI comes first.
 
 ## License
 
-[MIT](LICENSE)
+[Apache License 2.0](LICENSE) — see [NOTICE](NOTICE) for the attribution
+that redistributions must preserve.
 
 ---
 

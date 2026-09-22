@@ -1,0 +1,58 @@
+---
+title: Relicense from MIT to Apache-2.0
+slug: apache-2-relicensing
+type: feature
+status: review
+author: Claude
+created_at: '2026-09-22'
+updated_at: '2026-09-22'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  Move the project from MIT to the Apache License 2.0.
+
+  MIT already required attribution — preserving the copyright notice and the
+  licence text is one of its two conditions — so this is not about gaining
+  attribution that was missing. Apache-2.0 makes that attribution more durable
+  through a NOTICE file redistributions must keep, adds an explicit patent
+  grant, and stays compatible with GPL-3.0 downstream, so no future licensing
+  path (including dual commercial licensing) is closed off. Adoption cost for
+  users is unchanged: Apache-2.0 is permitted wherever MIT is.
+
+  The timing is the point. With a single copyright holder and no external
+  contributions, relicensing costs one commit; once contributions exist it
+  requires every contributor's consent.
+acceptance_criteria:
+- "Given the repository, when LICENSE is read, then it contains the canonical Apache License 2.0 text with the copyright holder filled into the appendix rather than left as a placeholder."
+- "Given the repository, when NOTICE is read, then it names the project and copyright holder and points at the licence."
+- "Given the built wheel, when its contents are inspected, then both LICENSE and NOTICE are included and the metadata declares the Apache-2.0 licence expression and classifier."
+- "Given the README, when the licence badge and licence section are read, then both state Apache-2.0 and the section points at NOTICE."
+- "Given the dependency licence policy, when it is evaluated, then apache-2.0 remains an allowed licence so the project does not fail its own scan."
+test_plan:
+- 'Manual check: `python -m build --wheel` produces a wheel whose dist-info/licenses/ holds LICENSE and NOTICE, with License-Expression Apache-2.0 and the Apache Software License classifier in METADATA.'
+- 'Manual check: no MIT reference remains in LICENSE, NOTICE, README.md or pyproject.toml.'
+- 'Regression: the existing test suite, ruff and mypy all pass unchanged, confirming the relicensing touched no behaviour.'
+qa_notes: |
+  Relicensing is a legal decision recorded here for provenance, not a code
+  change. No runtime behaviour is affected, which the unchanged test suite
+  confirms. The maintainer is the sole copyright holder at the time of this
+  change; a CONTRIBUTING-level CLA or DCO would be needed before accepting
+  external contributions if future relicensing is to remain possible.
+out_of_scope:
+- Dual commercial licensing, which Apache-2.0 leaves available but does not establish.
+- A CITATION.cff for academic citation, which no software licence provides.
+- Per-file SPDX headers across the source tree.
+implementation_skill:
+eval_plan:
+  scenarios: []
+  metrics: []
+technical_notes: |
+  The Apache-2.0 text is the canonical copy from apache.org, with only the
+  appendix placeholders filled in. Hatchling emits License-Expression and
+  License-File metadata from the `license` and `license-files` keys in
+  pyproject.toml, which replaces the previous `license = { file = ... }` form.
+linked_issues: []
+linked_prs: []
