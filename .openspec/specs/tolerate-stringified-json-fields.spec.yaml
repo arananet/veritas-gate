@@ -1,0 +1,59 @@
+---
+title: A field returned as a JSON string should not cost a judge
+slug: tolerate-stringified-json-fields
+type: bugfix
+status: review
+author: Claude
+created_at: '2026-09-22'
+updated_at: '2026-09-22'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  A judge returned its findings as a JSON *string* rather than a list — the
+  whole array, correctly formed, inside quotes. The parser rejected it, the
+  judge was recorded as an error, and an evaluation costing ten dollars came
+  back with one of its eight panel members missing.
+
+  Models do this. It is a well-known shape of structured output, the content is
+  intact, and discarding it wastes both the call and the coverage. The parser
+  already tolerates fences and surrounding prose for the same reason.
+
+  Before validating, any top-level field whose value is a string that parses as
+  JSON, and whose schema expects a list or an object, is decoded. Everything
+  else is untouched: a string field stays a string, even one that happens to
+  look like JSON, and malformed output still fails as it did.
+acceptance_criteria:
+- "Given a response whose list field arrived as a JSON string, when it is parsed, then the field is decoded and the result validates."
+- "Given a response whose object field arrived as a JSON string, when it is parsed, then the field is decoded and the result validates."
+- "Given a schema field that expects a string, when its value is a string containing JSON, then it is left alone."
+- "Given a string field whose content is not valid JSON, when it is parsed, then it is left alone."
+- "Given a response that is well formed, when it is parsed, then the result is identical to before."
+- "Given output that cannot be parsed by any means, when it is parsed, then a provider error is raised as before, naming the schema."
+- "Given a decoded field that still does not match the schema, when it is validated, then the failure is reported rather than silently dropped."
+test_plan:
+- 'Unit test: findings arriving as a JSON string are decoded and validate.'
+- 'Unit test: an object field arriving as a JSON string is decoded.'
+- 'Unit test: a genuine string field containing JSON-looking text is not decoded.'
+- 'Unit test: a string field with invalid JSON is left as it is.'
+- 'Unit test: a well-formed response parses exactly as before.'
+- 'Unit test: unparseable output still raises a provider error naming the schema.'
+- 'Unit test: a decoded field of the wrong shape still fails validation.'
+qa_notes: |
+  This is leniency about transport, not about content. A decoded field is
+  validated against the same schema as any other, so nothing reaches a judge
+  result that would not have reached it had the model returned the right type.
+out_of_scope:
+- Repairing malformed JSON.
+- Retrying a judge whose output could not be parsed.
+- Coercing nested fields; only the top level is decoded, which is where this occurs.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - A judge whose findings arrive stringified is recorded as a verdict, not an error.
+  metrics: []
+technical_notes: |
+  Decoding is decided by the schema's own annotation for that field, so the
+  parser never guesses what a value was meant to be.

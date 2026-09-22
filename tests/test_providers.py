@@ -6,6 +6,7 @@ import json
 from typing import Any
 
 import pytest
+from pydantic import BaseModel
 
 from veritas.judges.llm import JudgeResponse
 from veritas.providers import build_provider
@@ -437,3 +438,57 @@ def test_each_fallback_is_attempted_only_once(serve) -> None:
         _run(build_provider(spec("openai", server.base_url, max_retries=1)), "s", "u")
     # One original attempt plus one of each fallback, then the error is raised.
     assert len(attempts) == 3
+
+
+# ------------------------------------------- a field sent as a JSON string
+
+
+class _Schema(BaseModel):
+    summary: str = ""
+    findings: list[dict] = []
+    meta: dict = {}
+
+
+def test_a_list_field_sent_as_a_json_string_is_decoded() -> None:
+    """A judge returned its whole findings array inside quotes.
+
+    The parser rejected it, the judge was recorded as an error, and an
+    evaluation costing ten dollars came back a panel member short.
+    """
+    text = json.dumps({"summary": "ok", "findings": json.dumps([{"title": "a problem"}])})
+    parsed = parse_structured(text, _Schema)
+    assert parsed.findings == [{"title": "a problem"}]
+
+
+def test_an_object_field_sent_as_a_json_string_is_decoded() -> None:
+    text = json.dumps({"summary": "ok", "meta": json.dumps({"model": "x"})})
+    parsed = parse_structured(text, _Schema)
+    assert parsed.meta == {"model": "x"}
+
+
+def test_a_genuine_string_field_containing_json_is_left_alone() -> None:
+    """The schema decides, so the parser never guesses what a value meant."""
+    text = json.dumps({"summary": '{"not": "a structure"}'})
+    parsed = parse_structured(text, _Schema)
+    assert parsed.summary == '{"not": "a structure"}'
+
+
+def test_a_string_field_with_invalid_json_is_left_alone() -> None:
+    text = json.dumps({"summary": "ok", "findings": "not json at all"})
+    with pytest.raises(ProviderError):
+        parse_structured(text, _Schema)
+
+
+def test_a_well_formed_response_is_unaffected() -> None:
+    text = json.dumps({"summary": "ok", "findings": [{"title": "a"}], "meta": {"k": "v"}})
+    parsed = parse_structured(text, _Schema)
+    assert parsed.findings == [{"title": "a"}]
+    assert parsed.meta == {"k": "v"}
+
+
+def test_a_decoded_field_of_the_wrong_shape_still_fails() -> None:
+    """Leniency is about transport, never about content."""
+    text = json.dumps({"summary": "ok", "findings": json.dumps("a bare string")})
+    with pytest.raises(ProviderError) as exc:
+        parse_structured(text, _Schema)
+    assert "_Schema" in str(exc.value)
