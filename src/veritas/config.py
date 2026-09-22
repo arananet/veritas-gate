@@ -332,6 +332,43 @@ class ArtifactConfig(BaseModel):
     max_file_chars: int = 400_000
 
 
+class ModelPrice(BaseModel):
+    """What one model charges, per million tokens.
+
+    Operator-supplied. Veritas ships no rates: prices change without notice and
+    differ by provider and tier, and a stale rate frozen into an immutable run
+    record is worse than no rate at all.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    input_per_million: float = 0.0
+    output_per_million: float = 0.0
+
+    @field_validator("input_per_million", "output_per_million")
+    @classmethod
+    def _must_not_be_negative(cls, value: float) -> float:
+        if value < 0:
+            raise ValueError("a price per million tokens cannot be negative")
+        return value
+
+    def cost_for(self, input_tokens: int, output_tokens: int) -> float:
+        return round(
+            input_tokens / 1_000_000 * self.input_per_million
+            + output_tokens / 1_000_000 * self.output_per_million,
+            6,
+        )
+
+
+class PricingConfig(BaseModel):
+    """An optional price list, keyed by the model identifier the provider reports."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    currency: str = "USD"
+    rates: dict[str, ModelPrice] = Field(default_factory=dict)
+
+
 class VeritasConfig(BaseModel):
     """The parsed ``veritas.yaml``."""
 
@@ -349,6 +386,7 @@ class VeritasConfig(BaseModel):
     loop: LoopConfig = Field(default_factory=LoopConfig)
     repair: RepairConfig = Field(default_factory=RepairConfig)
     workspace: WorkspaceConfig = Field(default_factory=WorkspaceConfig)
+    pricing: PricingConfig = Field(default_factory=PricingConfig)
     concurrency: int = 4
     root: Path = Field(default_factory=Path.cwd, exclude=True)
 

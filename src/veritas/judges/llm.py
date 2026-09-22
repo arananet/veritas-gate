@@ -135,6 +135,7 @@ class LLMJudge:
             metadata={
                 "judge_version": self.version,
                 "model_role": self.model_role,
+                "model": _model_id(self.provider),
                 "provider": getattr(self.provider, "name", "unknown"),
                 "usage": response.usage,
             },
@@ -220,3 +221,14 @@ def _prefix_from_name(name: str) -> str:
 
 def judge_metadata(judge: LLMJudge) -> dict[str, Any]:
     return {"name": judge.name, "version": judge.version, "model_role": judge.model_role}
+
+
+def _model_id(provider: ModelProvider | None) -> str | None:
+    """The concrete model a provider runs, for per-model usage accounting.
+
+    A blind panel deliberately runs judges on different models, so a role alone
+    cannot attribute tokens or cost.
+    """
+    spec = getattr(provider, "spec", None)
+    model = getattr(spec, "model", None)
+    return model if isinstance(model, str) and model else None

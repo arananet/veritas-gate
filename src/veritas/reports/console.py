@@ -10,6 +10,7 @@ from rich.text import Text
 from veritas.models.evaluation import EvaluationResult, GateResult
 from veritas.models.finding import Finding, issue_key, severity_rank
 from veritas.reports.spinner import WorkSpinner
+from veritas.usage import UsageSummary
 
 SEVERITY_STYLE = {
     "critical": "bold red",
@@ -129,6 +130,7 @@ class ConsoleReporter:
         self._claims(result)
         self._accepted_risks(result.gate)
         self._findings_table(result.gate)
+        self._usage(result)
         self._blocking(result)
         self._gate(result.gate)
 
@@ -199,6 +201,59 @@ class ConsoleReporter:
         table.add_row(Text("INFO", style=SEVERITY_STYLE["info"]), str(gate.info))
         self.console.print("Findings:")
         self.console.print(table)
+        self.console.print()
+
+    def _usage(self, result: EvaluationResult) -> None:
+        """What the run spent: which models ran, their tokens, and cost if priced."""
+        summary = UsageSummary.model_validate(result.manifest.usage or {})
+        if not summary.by_model and not summary.calls:
+            return
+
+        table = Table(show_header=True, box=None, pad_edge=False, header_style="dim")
+        table.add_column("model")
+        table.add_column("calls", justify="right")
+        table.add_column("in", justify="right")
+        table.add_column("out", justify="right")
+        if summary.has_cost:
+            table.add_column("cost", justify="right")
+
+        for entry in summary.by_model:
+            row = [
+                entry.model,
+                str(entry.calls),
+                f"{entry.input_tokens:,}",
+                f"{entry.output_tokens:,}",
+            ]
+            if summary.has_cost:
+                row.append(_money(entry.cost, summary.currency))
+            table.add_row(*row)
+
+        total = [
+            "[bold]total[/bold]",
+            str(summary.calls),
+            f"{summary.input_tokens:,}",
+            f"{summary.output_tokens:,}",
+        ]
+        if summary.has_cost:
+            total.append(f"[bold]{_money(summary.cost, summary.currency)}[/bold]")
+        table.add_row(*total)
+
+        self.console.print("Usage:")
+        self.console.print(table)
+        if summary.unpriced_models:
+            names = ", ".join(summary.unpriced_models)
+            self.console.print(
+                f"  [yellow]no price configured for {names}; the total is incomplete[/yellow]"
+            )
+        if summary.calls_without_usage:
+            self.console.print(
+                f"  [yellow]{summary.calls_without_usage} call(s) reported no usage metadata; "
+                "token counts are a floor[/yellow]"
+            )
+        if summary.has_cost:
+            self.console.print(
+                "  [dim]estimated from your configured rates, not a billing record[/dim]"
+            )
         self.console.print()
 
     def _blocking(self, result: EvaluationResult) -> None:
@@ -283,3 +338,11 @@ class ConsoleReporter:
                 claim.source_location or "-",
             )
         self.console.print(table)
+
+
+def _money(value: float | None, currency: str | None) -> str:
+    if value is None:
+        return "—"
+    unit = f" {currency}" if currency and currency != "USD" else ""
+    prefix = "$" if not unit else ""
+    return f"{prefix}{value:,.4f}{unit}"

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from veritas.models.evaluation import EvaluationResult
 from veritas.models.finding import Finding, severity_rank
+from veritas.usage import UsageSummary
 
 SEVERITY_LABEL = {
     "critical": "CRITICAL",
@@ -47,6 +48,7 @@ def render_markdown(result: EvaluationResult) -> str:
     lines.extend(_checks_section(result))
     lines.extend(_findings_section(result))
     lines.extend(_actions_section(result))
+    lines.extend(_usage_section(result))
     lines.extend(_metadata_section(result))
     return "\n".join(lines).rstrip() + "\n"
 
@@ -188,6 +190,63 @@ def _actions_section(result: EvaluationResult) -> list[str]:
     return lines
 
 
+def _usage_section(result: EvaluationResult) -> list[str]:
+    """What the run spent, per model. Cost only when the operator priced it."""
+    summary = UsageSummary.model_validate(result.manifest.usage or {})
+    if not summary.calls:
+        return []
+
+    lines = ["## Model usage", ""]
+    header = "| Model | Calls | Input tokens | Output tokens |"
+    divider = "| --- | --- | --- | --- |"
+    if summary.has_cost:
+        header += " Cost |"
+        divider += " --- |"
+    lines.extend([header, divider])
+
+    for entry in summary.by_model:
+        row = (
+            f"| {entry.model} | {entry.calls} | {entry.input_tokens:,} | {entry.output_tokens:,} |"
+        )
+        if summary.has_cost:
+            row += f" {_money(entry.cost, summary.currency)} |"
+        lines.append(row)
+
+    total = (
+        f"| **Total** | {summary.calls} | {summary.input_tokens:,} | {summary.output_tokens:,} |"
+    )
+    if summary.has_cost:
+        total += f" **{_money(summary.cost, summary.currency)}** |"
+    lines.extend([total, ""])
+
+    if summary.unpriced_models:
+        names = ", ".join(f"`{name}`" for name in summary.unpriced_models)
+        lines.extend([f"No price is configured for {names}; the total is incomplete.", ""])
+    if summary.calls_without_usage:
+        lines.extend(
+            [
+                f"{summary.calls_without_usage} call(s) reported no usage metadata, "
+                "so token counts are a floor rather than a total.",
+                "",
+            ]
+        )
+    if summary.has_cost:
+        lines.extend(
+            [
+                "Cost is estimated from the rates configured when the run happened. "
+                "It is not a billing record.",
+                "",
+            ]
+        )
+    return lines
+
+
+def _money(value: float | None, currency: str | None) -> str:
+    if value is None:
+        return "n/a"
+    return f"{value:,.4f} {currency or 'USD'}"
+
+
 def _metadata_section(result: EvaluationResult) -> list[str]:
     manifest = result.manifest
     lines = [
@@ -200,7 +259,6 @@ def _metadata_section(result: EvaluationResult) -> list[str]:
         f"- Artifact commit: {manifest.artifact_commit or 'not a git checkout'}",
         f"- Started: {manifest.started_at.isoformat()}",
         f"- Finished: {manifest.finished_at.isoformat() if manifest.finished_at else 'n/a'}",
-        f"- Token usage: {manifest.usage}",
         "",
         "### Models",
         "",

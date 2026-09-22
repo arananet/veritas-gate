@@ -19,7 +19,14 @@ from veritas.artifacts.base import Artifact
 from veritas.checks import build_check
 from veritas.claims import build_graph, claim_findings
 from veritas.claims.graph import ClaimGraph
-from veritas.config import CheckConfig, ConfigError, GatePolicy, ModelConfig, VeritasConfig
+from veritas.config import (
+    CheckConfig,
+    ConfigError,
+    GatePolicy,
+    ModelConfig,
+    PricingConfig,
+    VeritasConfig,
+)
 from veritas.gate import evaluate_gate
 from veritas.judges.base import EvaluationContext
 from veritas.judges.llm import LLMJudge
@@ -29,12 +36,20 @@ from veritas.models.evaluation import (
     EvaluationResult,
     JudgeResult,
     JudgeStability,
+    MetaReview,
     RunManifest,
 )
 from veritas.models.finding import Finding, max_severity, severity_rank
 from veritas.profiles import JudgeSpec, Profile
 from veritas.providers import ModelProvider, ModelSpec, build_provider
 from veritas.runs import new_run_id
+from veritas.usage import (
+    META_JUDGE_LABEL,
+    CallUsage,
+    UsageSummary,
+    call_from_metadata,
+    summarize,
+)
 
 ProgressFn = Callable[[str, str, str], None]
 """``(phase, name, status)`` — status is one of ``start``, ``ok``, ``warn``, ``fail``."""
@@ -181,6 +196,8 @@ class Engine:
         )
         self.options.progress("gate", gate.status, "ok" if gate.status == "PASS" else "warn")
 
+        usage = _aggregate_usage(judge_results, meta, self.config.pricing)
+
         manifest = RunManifest(
             run_id=run_id,
             started_at=started,
@@ -196,7 +213,7 @@ class Engine:
             models=self._model_metadata(),
             prompt_versions=self.profile.prompt_versions(),
             judge_versions={judge.name: judge.version for judge in self.build_judges()},
-            usage=_aggregate_usage(judge_results),
+            usage=usage.model_dump(mode="json"),
         )
         return EvaluationResult(
             manifest=manifest,
@@ -318,16 +335,37 @@ def _stability_for(judge: str, attempts: list[JudgeResult]) -> JudgeStability:
     )
 
 
-def _aggregate_usage(judge_results: list[JudgeResult]) -> dict[str, Any]:
-    totals = {"input_tokens": 0, "output_tokens": 0, "calls": 0}
-    for result in judge_results:
-        usage = result.metadata.get("usage") or {}
-        totals["calls"] += 1
-        for key in ("input_tokens", "output_tokens"):
-            value = usage.get(key)
-            if isinstance(value, int):
-                totals[key] += value
-    return totals
+def _aggregate_usage(
+    judge_results: list[JudgeResult],
+    meta: MetaReview | None = None,
+    pricing: PricingConfig | None = None,
+) -> UsageSummary:
+    """Fold every model call in the run into per-call, per-model and total usage.
+
+    The MetaJudge's own call is one of them. It used to be dropped, which
+    understated every run that consulted a meta model.
+    """
+    calls = [call_from_metadata(result.judge, result.metadata) for result in judge_results]
+    if meta is not None:
+        meta_call = _meta_usage(meta)
+        if meta_call is not None:
+            calls.append(meta_call)
+    return summarize(calls, pricing)
+
+
+def _meta_usage(meta: MetaReview) -> CallUsage | None:
+    """The MetaJudge's call, or None when it ran deterministically."""
+    usage = meta.metadata.get("meta_model_usage")
+    if not isinstance(usage, dict):
+        return None
+    return call_from_metadata(
+        META_JUDGE_LABEL,
+        {
+            "usage": usage,
+            "model": meta.metadata.get("meta_model"),
+            "provider": meta.metadata.get("meta_provider"),
+        },
+    )
 
 
 def all_findings(result: EvaluationResult) -> list[Finding]:

@@ -478,6 +478,12 @@ checks:
 
 execution:
   allow: [pytest]                   # nothing runs unless it is listed here
+
+pricing:                            # optional; without it you get tokens only
+  currency: USD
+  rates:
+    claude-opus-5: {input_per_million: 3.0, output_per_million: 15.0}
+    gpt-5: {input_per_million: 1.25, output_per_million: 10.0}
 ```
 
 Four check types, three of which run nothing:
@@ -523,6 +529,39 @@ spots do not decide the outcome.
 
 Exit codes: `0` pass, `1` pass with warnings, `2` revise, `3` fail, `4` usage
 or configuration error.
+
+---
+
+### What a run costs
+
+Every evaluation reports the models it used and the tokens they consumed,
+broken down per model and in total, on the console and in the run manifest:
+
+```text
+Usage:
+model          calls       in     out     cost
+claude-opus-5      3  105,311   6,737  $0.4170
+gemini-3-pro       1   47,120   1,988        —
+gpt-5              1   48,044   4,310  $0.1032
+total              5  200,475  13,035  $0.5201
+  no price configured for gemini-3-pro; the total is incomplete
+```
+
+Tokens are always counted. Cost appears only when you configure rates, because
+**Veritas ships no price list and never will**. Prices depend on the model,
+change without notice, and differ by provider and tier; a rate compiled into
+Veritas would go stale and then be frozen into an immutable run record, which
+is worse than reporting no cost at all. Set your own rates under `pricing:` and
+they are recorded with the run, so a run you read next year shows what it cost
+when it ran rather than what it would cost today.
+
+A model with no configured rate is never treated as free: it is named and the
+total is marked incomplete. The figure is an estimate for comparing runs and
+budgeting, derived from your rates and the token counts the provider reported.
+It is not a billing record — discounts, cache reads and batch tiers live on the
+provider's side.
+
+The MetaJudge's own call is counted alongside the judges'.
 
 ---
 

@@ -14,6 +14,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from veritas.judges.llm import _model_id
 from veritas.models.evaluation import (
     CheckResult,
     ConsolidatedFinding,
@@ -172,6 +173,8 @@ class MetaJudge:
             {*review.unresolved, *[item for item in payload.unresolved if item in known]}
         )
         review.metadata["meta_model_usage"] = response.usage
+        review.metadata["meta_model"] = _model_id(self.provider)
+        review.metadata["meta_provider"] = getattr(self.provider, "name", None)
         return review
 
 

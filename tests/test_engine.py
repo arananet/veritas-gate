@@ -94,7 +94,10 @@ async def test_full_pipeline_produces_a_run(
     # Reproducibility metadata is recorded.
     assert result.manifest.profile == "generic-document"
     assert result.manifest.prompt_versions
-    assert result.manifest.usage["calls"] == 3
+    # Three judges plus the MetaJudge's own call, which used to go uncounted.
+    assert result.manifest.usage["calls"] == 4
+    assert {entry["model"] for entry in result.manifest.usage["by_model"]}
+    assert result.manifest.usage["cost"] is None  # no pricing configured
 
 
 async def test_a_critical_finding_from_one_judge_fails_the_gate(
