@@ -56,6 +56,21 @@ The `reference-integrity` check tells the two apart:
 If you find yourself editing correct prose to satisfy a judge, check which of
 those two you are actually looking at.
 
+Not everything cited should be supplied. A lockfile, a built PDF, a directory
+of prior manuscript versions — excluding these is how an evaluation stays
+affordable, and ours went from $10.60 a round to $1.42 by narrowing
+`artifact.paths` and evaluating one judge at a time while iterating. An
+unsupplied path is reported as minor and under its own category
+(`check/<name>/unsupplied`), so a deliberate exclusion can be accepted as a
+known risk without silencing a genuine dangling reference:
+
+```yaml
+gate:
+  accepted_risks:
+    - category: check/reference-integrity/unsupplied
+      reason: "Lockfiles, PDFs and prior versions are excluded to keep evaluation affordable."
+```
+
 ## Declare every run you kept
 
 Four directories from the same experiment, one cited and three unmentioned,

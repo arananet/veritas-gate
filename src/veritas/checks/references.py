@@ -139,15 +139,18 @@ class ReferenceIntegrityCheck:
         count = len(citations)
         where = "1 citation" if count == 1 else f"{count} citations"
         return check_finding(
-            self.name,
+            # Its own category, so a deliberate exclusion can be accepted as a
+            # known risk without also silencing a genuine dangling reference.
+            f"{self.name}/unsupplied",
             index,
             title=f"Cited path exists but was not supplied to Veritas: {rel}",
-            severity=self.config.severity_on_failure,
+            severity=self.config.severity_on_unsupplied,
             description=(
                 f"{rel} exists on disk and is cited by {where}, but it is not within "
-                "the artifact's configured paths. The documents are right and the "
-                "configuration is incomplete: judges cannot see this, and will report "
-                "it as missing evidence."
+                "the artifact's configured paths. Judges cannot see it and may report "
+                "it as missing evidence. Either add it to artifact.paths, or, if it is "
+                "excluded on purpose — a lockfile, a PDF, prior versions — leave it out "
+                "and accept this finding."
             ),
             location=citations[0].split(" -> ")[0],
             evidence=citations[:10],

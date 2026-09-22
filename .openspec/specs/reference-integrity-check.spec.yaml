@@ -46,6 +46,9 @@ acceptance_criteria:
 - "Given a slashed token in inline code whose first segment names nothing in the repository, such as an upstream owner and repository, when the check runs, then it is not reported."
 - "Given several citations to one path that exists but was not supplied, when findings are reported, then they are one finding naming the single configuration line that fixes them all."
 - "Given citations to different unsupplied paths, when findings are reported, then each path is its own finding."
+- "Given a path cited but deliberately not supplied, when the finding is reported, then it carries the unsupplied severity, which defaults to minor, and not the severity used for a path that does not exist."
+- "Given a finding about an unsupplied path, when it is categorised, then its category is distinct from a dangling reference, so one can be accepted as a known risk without silencing the other."
+- "Given a configured unsupplied severity, when such a finding is reported, then it carries that severity."
 test_plan:
 - 'Unit test: a resolvable relative link produces no finding.'
 - 'Unit test: a link to a path that exists nowhere is reported as unresolved, naming the line.'
@@ -56,6 +59,8 @@ test_plan:
 - 'Unit test: versions, dotted identifiers and LaTeX package names in inline code are not reported.'
 - 'Unit test: an upstream owner/repository token in inline code is not reported.'
 - 'Unit test: repeated citations to one unsupplied path are one finding; different paths stay separate.'
+- 'Unit test: an unsupplied path is minor by default while a dangling one keeps the configured failure severity.'
+- 'Unit test: the two kinds carry different categories, so accepting one does not silence the other.'
 - 'Unit test: a directory target resolves as well as a file target.'
 - 'Unit test: an unreadable target document produces an error result.'
 - 'Unit test: no configured documents yields a skipped result.'
@@ -83,3 +88,11 @@ technical_notes: |
   chasing ghosts and buries the findings that matter. Inline code is held
   to a stricter test than a Markdown link, because a link to a relative
   path is unambiguous and a slashed token in prose is not.
+
+  Not everything cited should be supplied. A lockfile, a PDF, a directory of
+  prior manuscript versions -- excluding these is how an operator keeps an
+  evaluation affordable, and reporting each as a blocking defect turns a
+  deliberate choice into permanent noise. The observation is still worth
+  making, because judges will report the file as missing evidence, but it
+  is advisory by default and separately categorised so it can be accepted
+  without silencing a genuine dangling reference.

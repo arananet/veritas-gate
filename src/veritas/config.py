@@ -195,6 +195,11 @@ class CheckConfig(BaseModel):
     required_patterns: list[ContentPattern] = Field(default_factory=list)
     forbidden_patterns: list[ContentPattern] = Field(default_factory=list)
     case_sensitive: bool = False
+    # For reference-integrity: a cited path that exists but sits outside
+    # artifact.paths is a statement about configuration, not a defect in the
+    # artifact. Excluding a lockfile or a PDF is how an evaluation is kept
+    # affordable, so this is advisory by default.
+    severity_on_unsupplied: Literal["info", "minor", "major", "critical"] = "minor"
 
 
 class ExecutionConfig(BaseModel):

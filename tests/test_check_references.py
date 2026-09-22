@@ -81,9 +81,13 @@ async def test_a_path_on_disk_but_outside_artifact_paths_is_a_configuration_find
     assert result.status == "fail"
     finding = result.findings[0]
     assert "not supplied" in finding.title
-    assert "configuration is incomplete" in finding.description
     assert "artifact.paths" in (finding.recommendation or "")
     assert "paper/evidence/run.json" in (finding.recommendation or "")
+    # Advisory by default: excluding a lockfile or a PDF is how an evaluation
+    # is kept affordable, and that is a choice, not a defect.
+    assert finding.severity == "minor"
+    # Its own category, so accepting it does not silence a dangling reference.
+    assert finding.category == "check/references/unsupplied"
 
 
 async def test_external_urls_are_ignored(tmp_path: Path) -> None:
@@ -263,3 +267,28 @@ async def test_separate_unsupplied_paths_stay_separate(tmp_path: Path) -> None:
     )
     result = await check().run(artifact)
     assert len(result.findings) == 2
+
+
+async def test_a_dangling_reference_keeps_the_failure_severity(tmp_path: Path) -> None:
+    """The two kinds are not the same problem and must not share a severity."""
+    artifact = make(tmp_path, "See [gone](./nowhere.json).\n")
+    result = await check().run(artifact)
+    assert result.findings[0].severity == "major"
+    assert result.findings[0].category == "check/references"
+
+
+async def test_the_unsupplied_severity_is_configurable(tmp_path: Path) -> None:
+    (tmp_path / "paper" / "evidence").mkdir(parents=True)
+    (tmp_path / "paper" / "evidence" / "run.json").write_text("{}", encoding="utf-8")
+    artifact = make(tmp_path, "See [it](./evidence/run.json).\n", paths=["paper/manuscript.md"])
+    checker = build_check(
+        "references",
+        CheckConfig(
+            type="reference-integrity",
+            target="paper/manuscript.md",
+            severity_on_unsupplied="info",
+        ),
+        ExecutionConfig(),
+    )
+    result = await checker.run(artifact)
+    assert result.findings[0].severity == "info"
