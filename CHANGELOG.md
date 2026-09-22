@@ -61,6 +61,13 @@ Guidelines:
   `gpt-5.6-terra`, `gemini-3.1-pro`. The OpenSpec template's own spec-review and
   issue-autofix agents were moved off their stale ids too. The example-paper test no longer names the default
   ids, so bumping a model cannot break it (spec: veritas-core-evaluation-engine).
+- A configured path resolving outside the artifact directory was reported with its
+  absolute path, putting the user's home directory into every judge prompt and into the
+  findings and repair plans built from them — where a path outside the workspace is one
+  a repair agent could write to. Such files are now described relative to the artifact
+  (`../src/adapter.ts`), and both `veritas files` and `veritas evaluate` say when paths
+  reach outside, warning that a copy-mode workspace will not contain them
+  (spec: veritas-core-evaluation-engine).
 - Per-file truncation was capped at 24,000 characters, which silently cut a 30,000
   character manuscript: the judges reviewed a paper whose last quarter they never saw.
   The cap is now 400,000 characters, configurable as `artifact.max_file_chars`, and any

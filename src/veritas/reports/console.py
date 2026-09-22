@@ -51,6 +51,29 @@ class ConsoleReporter:
         self.console.print(f"Artifact: [bold]{artifact}[/bold]")
         self.console.print()
 
+    def external_paths_warning(self, paths: list[str], mode: str) -> None:
+        """Say when configured paths reach outside the artifact directory.
+
+        They are evaluated fine, but a repair workspace that copies only the
+        artifact directory will not contain them, so the loop would repair an
+        incomplete tree.
+        """
+        if self.quiet or not paths:
+            return
+        self.console.print(
+            f"[yellow]note:[/yellow] {len(paths)} configured path(s) resolve outside "
+            "the artifact directory:"
+        )
+        for path in paths:
+            self.console.print(f"  [yellow]·[/yellow] {path}")
+        if mode in ("copy", "snapshot"):
+            self.console.print(
+                f"[yellow]workspace.mode is '{mode}', which copies only the artifact "
+                "directory, so `veritas loop` would not see these. Use 'worktree', or "
+                "run from the directory that contains them.[/yellow]"
+            )
+        self.console.print()
+
     def truncation_warning(self, files: list[str], limit: int) -> None:
         """Say when the judges were shown only part of a file.
 

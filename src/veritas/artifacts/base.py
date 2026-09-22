@@ -7,9 +7,10 @@ only collects addressable text segments that judges and checks can cite.
 
 from __future__ import annotations
 
+import os
 import subprocess
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 TEXT_SUFFIXES = {
@@ -117,6 +118,23 @@ class Artifact:
     def file_list(self) -> list[str]:
         return [segment.path for segment in self.segments()]
 
+    def external_paths(self) -> list[str]:
+        """Configured paths that resolve outside the artifact root.
+
+        These work, but they change what a workspace must contain: a copy of
+        the artifact directory alone will not include them.
+        """
+        outside: list[str] = []
+        for rel in self.paths:
+            target = (self.root / rel).resolve()
+            if not target.exists():
+                continue
+            try:
+                target.relative_to(self.root.resolve())
+            except ValueError:
+                outside.append(rel)
+        return outside
+
     def truncated_files(self) -> list[str]:
         """Files the judges will only see part of."""
         return [
@@ -147,11 +165,25 @@ def _read_file(root: Path, target: Path) -> ArtifactSegment | None:
         text = target.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return None
+    return ArtifactSegment(path=relative_path(root, target), text=text)
+
+
+def relative_path(root: Path, target: Path) -> str:
+    """Describe ``target`` relative to ``root``, even when it sits outside it.
+
+    An absolute path here would put the user's home directory into every judge
+    prompt, and would travel into findings and repair plans — where a path
+    outside the workspace is one an agent could write to. A ``../`` relative
+    path stays portable across the workspace copies the repair loop makes.
+    """
     try:
-        rel = target.relative_to(root).as_posix()
+        return target.relative_to(root).as_posix()
     except ValueError:
-        rel = target.as_posix()
-    return ArtifactSegment(path=rel, text=text)
+        pass
+    try:
+        return PurePosixPath(os.path.relpath(target, root)).as_posix()
+    except ValueError:  # pragma: no cover - different drive on Windows
+        return target.as_posix()
 
 
 def _read_tree(root: Path, directory: Path) -> list[ArtifactSegment]:

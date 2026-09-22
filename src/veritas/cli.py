@@ -249,6 +249,13 @@ def files(
         table.add_row(segment.path, f"{size:,}", note)
     console.print(table)
     console.print()
+    outside = artifact.external_paths()
+    if outside:
+        console.print(
+            f"[yellow]{len(outside)} path(s) resolve outside the artifact directory:[/yellow] "
+            + ", ".join(outside)
+        )
+        console.print()
     console.print(f"{len(segments)} file(s), {total_chars:,} characters")
     console.print(
         f"Roughly {per_judge_tokens:,} input tokens [bold]per judge[/bold], "
@@ -317,6 +324,9 @@ def evaluate(
     reporter = ConsoleReporter(console, quiet=quiet or json_output)
     reporter.header(loaded_profile.name, str(target))
     reporter.truncation_warning(artifact.truncated_files(), artifact.max_file_chars)
+    reporter.external_paths_warning(
+        artifact.external_paths(), loaded_config.workspace.resolved_mode()
+    )
     options = EngineOptions(
         judge_filter=list(judge or []),
         runs=runs,
