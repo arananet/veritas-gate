@@ -31,6 +31,8 @@ STATUS_MARK = {
     "ok": ("✓ ", "green"),
     "warn": ("! ", "yellow"),
     "fail": ("✗ ", "red"),
+    # A verdict and a breakdown must never look alike.
+    "error": ("⚠ ", "bold red"),
 }
 
 

@@ -25,9 +25,16 @@ STOP_STYLE: dict[StopReason, str] = {
 class LoopReporter:
     """Streams the autopilot run as it happens."""
 
-    def __init__(self, console: Console | None = None, *, quiet: bool = False) -> None:
+    def __init__(
+        self,
+        console: Console | None = None,
+        *,
+        quiet: bool = False,
+        verbose: bool = False,
+    ) -> None:
         self.console = console or Console()
         self.quiet = quiet
+        self.verbose = verbose
         self._engine_phase: str | None = None
         self._spinner = WorkSpinner(self.console)
 
@@ -96,6 +103,7 @@ class LoopReporter:
     def _evaluated(self, payload: dict[str, Any]) -> None:
         gate: GateResult = payload["gate"]
         self.console.print("Evaluating...")
+        self._judge_errors(payload.get("result"))
         self.console.print(
             f"  [{SEVERITY_STYLE['critical']}]Critical: {gate.critical}[/]"
             f"  [{SEVERITY_STYLE['major']}]Major: {gate.major}[/]"
@@ -104,6 +112,25 @@ class LoopReporter:
         style = GATE_STYLE[gate.status]
         self.console.print(f"  Gate: [{style}]{gate.status}[/{style}]")
         self.console.print()
+
+    def _judge_errors(self, evaluation: Any) -> None:
+        """Say which judges could not complete, and why.
+
+        A judge that broke and a judge that found blocking problems both
+        streamed as a red mark, so a degraded panel read as a thorough one.
+        """
+        results = getattr(evaluation, "judge_results", None) or []
+        failed = [item for item in results if item.status == "error"]
+        if not failed:
+            return
+        self.console.print(
+            f"  [bold red]{len(failed)} judge(s) could not complete "
+            "-- this evaluation is incomplete:[/bold red]"
+        )
+        for item in failed:
+            self.console.print(f"    [bold red]⚠[/bold red] {item.judge}")
+            if item.summary:
+                self.console.print(f"      [dim]{item.summary}[/dim]")
 
     def _planned(self, payload: dict[str, Any]) -> None:
         plan: RepairPlan = payload["plan"]
@@ -117,8 +144,23 @@ class LoopReporter:
 
     def _repairing(self, payload: dict[str, Any]) -> None:
         self.console.print("Applying autonomous repairs...")
+        self._spinner.start()
+
+    def agent_output(self, line: str) -> None:
+        """Relay one line of the configured repair agent's own output.
+
+        Veritas neither parses nor interprets it: this is whatever Codex,
+        Claude Code, a Copilot CLI or any other configured tool chose to print.
+        """
+        if self.quiet:
+            return
+        if self.verbose:
+            self._spinner.mark_done(line, f"    [dim]{_escape(line)}[/dim]")
+            return
+        self._spinner.note(line)
 
     def _repaired(self, payload: dict[str, Any]) -> None:
+        self._spinner.clear_note()
         repair: RepairResult = payload["repair"]
         for action_id in repair.action_ids:
             mark = "✓" if repair.status == "completed" else "!"
@@ -195,7 +237,22 @@ class LoopReporter:
 
         if result.workspace and result.mode == "autopilot":
             self.console.print()
-            self.console.print(f"Changes are available at:\n  {result.workspace}")
+            if result.files_changed:
+                # Veritas never applies a repair to your tree: the repairer
+                # proposes, you accept. Saying where the changes are is not
+                # enough -- say how to read them and how to take them.
+                self.console.print(
+                    f"[bold]{len(result.files_changed)} file(s) were changed, "
+                    "in a workspace, not in your tree.[/bold]"
+                )
+                self.console.print()
+                self.console.print("  Review them:")
+                self.console.print(f"    git -C {result.workspace} diff")
+                self.console.print()
+                self.console.print("  Take them:")
+                self.console.print(f"    git -C {result.workspace} diff | git apply")
+            else:
+                self.console.print(f"Workspace:\n  {result.workspace}")
 
     def plan_preview(self, plan: RepairPlan) -> None:
         """Print a plan without applying it (assist mode and dry runs)."""
@@ -353,3 +410,8 @@ def render_loop_report(result: LoopResult, evaluation: EvaluationResult | None =
 
     lines.extend(["## Usage", "", f"- {result.usage}", ""])
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _escape(text: str) -> str:
+    """Markup in an agent's output is text, not formatting."""
+    return text.replace("[", "\\[")

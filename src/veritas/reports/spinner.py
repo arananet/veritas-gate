@@ -40,6 +40,7 @@ class WorkSpinner:
         self.console = console
         self._status: Status | None = None
         self._running: dict[str, str] = {}
+        self._note: str = ""
 
     def start(self) -> None:
         if self._status is None:
@@ -61,8 +62,24 @@ class WorkSpinner:
             self.console.print(line)
         self._refresh()
 
+    def note(self, text: str) -> None:
+        """Show a line of someone else's output beside the spinner.
+
+        A repair agent runs for minutes; without its latest line, a spinner
+        cannot be told apart from a hang.
+        """
+        self._note = _one_line(text)
+        self._refresh()
+
+    def clear_note(self) -> None:
+        self._note = ""
+        self._refresh()
+
     def _refresh(self) -> None:
         if self._status is None:
+            return
+        if self._note and not self._running:
+            self._status.update(f"[dim]{self._note}[/dim]")
             return
         if not self._running:
             self._status.update("")
@@ -75,3 +92,10 @@ class WorkSpinner:
             self._status.stop()
             self._status = None
         self._running.clear()
+
+
+def _one_line(text: str, limit: int = 110) -> str:
+    """Flatten and clip someone else's output so it cannot break the spinner line."""
+    flat = " ".join(text.split())
+    escaped = flat.replace("[", "\\[")
+    return escaped if len(escaped) <= limit else escaped[: limit - 1] + "…"

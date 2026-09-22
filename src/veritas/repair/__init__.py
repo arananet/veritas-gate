@@ -7,6 +7,8 @@ correct.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from veritas.repair.base import PermissionViolation, RepairAgent, enforce_permissions
 from veritas.repair.cli_agent import GenericCLIRepairAgent, load_repair_prompt
 from veritas.repair.mock import MockRepairAgent
@@ -32,7 +34,9 @@ __all__ = [
 ]
 
 
-def build_repair_agent(config: RepairConfig) -> RepairAgent:
+def build_repair_agent(
+    config: RepairConfig, on_output: Callable[[str], None] | None = None
+) -> RepairAgent:
     """Instantiate the configured agent.
 
     New agents (Codex, Claude Code, an API-backed repairer, a human queue) plug
@@ -44,7 +48,7 @@ def build_repair_agent(config: RepairConfig) -> RepairAgent:
     if provider == "mock":
         return MockRepairAgent(permissions=config.permissions)
     if provider in ("generic-cli", "cli"):
-        return GenericCLIRepairAgent(config.agent, config.permissions)
+        return GenericCLIRepairAgent(config.agent, config.permissions, on_output=on_output)
     raise ConfigError(
         f"unknown repair agent provider '{provider}'; available providers: generic-cli, mock"
     )

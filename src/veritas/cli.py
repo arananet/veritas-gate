@@ -498,6 +498,10 @@ def loop(
     quiet: Annotated[
         bool, typer.Option("--quiet", "-q", help="Print only the stop reason.")
     ] = False,
+    verbose: Annotated[
+        bool,
+        typer.Option("--verbose", "-v", help="Print the repair agent's full output."),
+    ] = False,
 ) -> None:
     """Autopilot: the bounded evaluate, repair and re-evaluate loop."""
     target = path.resolve()
@@ -509,7 +513,7 @@ def loop(
         loaded_config.repair.agent.provider = agent
 
     artifact = _artifact_for(target, loaded_config, loaded_profile)
-    reporter = LoopReporter(console, quiet=quiet)
+    reporter = LoopReporter(console, quiet=quiet, verbose=verbose)
     budget = max_iterations or loaded_config.loop.max_iterations
     reporter.header(loaded_profile.name, str(target), "dry-run" if dry_run else "autopilot", budget)
 
@@ -536,7 +540,7 @@ def loop(
     workspace_config.root = workspace.root
 
     try:
-        agent_impl = build_repair_agent(loaded_config.repair)
+        agent_impl = build_repair_agent(loaded_config.repair, on_output=reporter.agent_output)
     except ConfigError as exc:
         raise _fail(str(exc)) from exc
 

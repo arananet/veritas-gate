@@ -205,6 +205,15 @@ Three operating modes:
 
 Add `--dry-run` to see the plan autopilot *would* apply, and stop there.
 
+While a repair runs, the agent's most recent line is shown beside the
+spinner, so a long repair can be told apart from a hang. `--verbose`
+prints its whole transcript. Veritas neither parses nor interprets that
+output: it is whatever the configured tool chose to print.
+
+Repairs land in a workspace, never in your tree. When the loop stops it
+prints the commands to review the diff and to apply it — Veritas will not
+apply one for you, because accepting a repair is the operator's decision.
+
 ### The loop always stops
 
 ```yaml
@@ -538,6 +547,7 @@ spots do not decide the outcome.
 | `veritas loop` | Autopilot: the bounded evaluate, repair, re-evaluate loop |
 | `veritas loop --dry-run` | Show what autopilot would do, and stop |
 | `veritas loop --resume` | Continue from the previous loop's ledger |
+| `veritas loop --verbose` | Print the repair agent's full output as it runs |
 | `veritas loop-report` | Show the report from the latest loop |
 | `veritas diff <a> <b>` | Compare two evaluations issue by issue |
 | `veritas profiles` | List every discoverable profile |

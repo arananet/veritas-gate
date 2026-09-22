@@ -408,3 +408,74 @@ async def test_an_agent_claiming_success_without_changing_a_file_is_a_failure(
     assert result.status == "failed"
     assert any("changed no file" in note for note in result.notes)
     workspace.cleanup()
+
+
+# ------------------------------------------- live agent output
+
+
+async def test_agent_output_is_streamed_line_by_line(tmp_path: Path) -> None:
+    """A repair runs for minutes; a spinner alone cannot be told from a hang."""
+    seen: list[str] = []
+    workspace = temporary_workspace(_artifact_dir(tmp_path))
+    agent = GenericCLIRepairAgent(
+        RepairAgentConfig(
+            command=[
+                sys.executable,
+                "-c",
+                "print('reading the manuscript'); print('editing doc.md'); "
+                "open('doc.md','a').write('x')",
+            ],
+            timeout=60,
+        ),
+        RepairPermissions(),
+        on_output=seen.append,
+    )
+    artifact = Artifact(id="a", type="document", root=workspace.root, paths=["doc.md"])
+
+    result = await agent.repair(artifact, plan_with(), workspace)
+
+    assert seen == ["reading the manuscript", "editing doc.md"]
+    # What was streamed is what is retained.
+    assert "editing doc.md" in result.metadata["output"]
+    workspace.cleanup()
+
+
+async def test_a_silent_agent_streams_nothing(tmp_path: Path) -> None:
+    seen: list[str] = []
+    workspace = temporary_workspace(_artifact_dir(tmp_path))
+    agent = GenericCLIRepairAgent(
+        RepairAgentConfig(
+            command=[sys.executable, "-c", "open('doc.md','a').write('x')"], timeout=60
+        ),
+        RepairPermissions(),
+        on_output=seen.append,
+    )
+    artifact = Artifact(id="a", type="document", root=workspace.root, paths=["doc.md"])
+    result = await agent.repair(artifact, plan_with(), workspace)
+    assert seen == []
+    assert result.status == "completed"
+    workspace.cleanup()
+
+
+async def test_non_utf8_output_does_not_break_the_repair(tmp_path: Path) -> None:
+    """An agent may emit progress bytes that are not valid UTF-8 mid-line."""
+    seen: list[str] = []
+    workspace = temporary_workspace(_artifact_dir(tmp_path))
+    agent = GenericCLIRepairAgent(
+        RepairAgentConfig(
+            command=[
+                sys.executable,
+                "-c",
+                "import sys; sys.stdout.buffer.write(b'caf\\xe9\\n'); sys.stdout.flush(); "
+                "open('doc.md','a').write('x')",
+            ],
+            timeout=60,
+        ),
+        RepairPermissions(),
+        on_output=seen.append,
+    )
+    artifact = Artifact(id="a", type="document", root=workspace.root, paths=["doc.md"])
+    result = await agent.repair(artifact, plan_with(), workspace)
+    assert seen and seen[0].startswith("caf")
+    assert result.status == "completed"
+    workspace.cleanup()
