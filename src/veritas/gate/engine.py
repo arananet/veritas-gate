@@ -31,7 +31,7 @@ def evaluate_gate(
     # never make it disappear. `findings` below is what the policy is applied
     # to, with accepted risks removed, because that is what accepting means.
     counts = severity_counts(findings)
-    accepted_ids, accepted, stale = _partition_accepted(findings, policy, today)
+    accepted_ids, accepted, stale, accepted_findings = _partition_accepted(findings, policy, today)
     findings = [item for item in findings if item.id not in accepted_ids]
     blocking_counts = severity_counts(findings)
     blocking: list[str] = []
@@ -111,8 +111,8 @@ def evaluate_gate(
 
     if accepted:
         reasons.append(
-            f"{len(accepted)} finding(s) accepted as known risk and not blocking: "
-            + ", ".join(accepted)
+            f"{len(accepted)} rule(s) accepted {len(accepted_findings)} finding(s) as "
+            "known risk, so they do not block: " + ", ".join(accepted)
         )
     if stale:
         reasons.append(
@@ -141,6 +141,7 @@ def evaluate_gate(
         failed_checks=failed_checks,
         judge_errors=judge_errors,
         accepted_risks=accepted,
+        accepted_findings=accepted_findings,
         stale_accepted_risks=stale,
         reasons=reasons,
     )
@@ -150,28 +151,34 @@ def _partition_accepted(
     findings: list[Finding],
     policy: GatePolicy,
     today: date | None,
-) -> tuple[set[str], list[str], list[str]]:
+) -> tuple[set[str], list[str], list[str], list[str]]:
     """Split the accepted risks into those in force and those gone stale.
 
-    Returns the per-run ids to exclude from blocking, the stable ids actually
-    accepted, and the stable ids configured but no longer matching any finding
-    (or expired). A stale exception is reported rather than removed, because an
-    exception nobody revisits is how a gate quietly stops meaning anything.
+    Returns the per-run ids to exclude from blocking, the rules actually
+    applied, the rules matching nothing (or expired), and the findings each
+    rule covered. That last list matters: a rule written by category can cover
+    many findings at once, and a blanket exemption nobody can see the reach of
+    is how a gate stops meaning anything.
     """
     if not policy.accepted_risks:
-        return set(), [], []
+        return set(), [], [], []
 
     now = today or datetime.now(UTC).date()
-    present = {issue_key(finding): finding for finding in findings}
 
     excluded: set[str] = set()
     accepted: list[str] = []
     stale: list[str] = []
+    covered: list[str] = []
     for risk in policy.accepted_risks:
-        finding = present.get(risk.id)
-        if finding is None or not risk.active_on(now):
-            stale.append(risk.id)
+        matched = [
+            finding
+            for finding in findings
+            if risk.matches(finding.category, finding.location, issue_key(finding))
+        ]
+        if not matched or not risk.active_on(now):
+            stale.append(risk.label)
             continue
-        excluded.add(finding.id)
-        accepted.append(risk.id)
-    return excluded, sorted(accepted), sorted(stale)
+        excluded.update(finding.id for finding in matched)
+        accepted.append(risk.label)
+        covered.extend(finding.id for finding in matched)
+    return excluded, sorted(accepted), sorted(stale), sorted(dict.fromkeys(covered))

@@ -236,10 +236,26 @@ deliberate choice with a date on it.
 ```yaml
 gate:
   accepted_risks:
-    - id: F6F3F837D                 # the stable Issue id from `veritas findings`
+    # By what and where — survives a judge rewording the same problem
+    - category: reproducibility
+      location: paper/REPRODUCTION.md
       reason: "Pre-publication: paper files stay private until submission."
       expires: 2026-12-31           # optional; after this it blocks again
+
+    # Or by exact identity, using the Issue id from `veritas findings`
+    - id: F6F3F837D
+      reason: "Tracked in issue #12."
 ```
+
+Prefer `category` and `location` when the artifact is still changing. The `id`
+is derived from the finding's title, so a judge rewording the same problem
+after you edit the artifact produces a new id and the acceptance goes stale —
+exactly when you needed it to hold. Every criterion you give must match, so
+adding a `location` narrows a category rule. A rule with no criteria at all is
+rejected: that is not an exception, it is an off switch.
+
+Each run names the rules that applied and, when a rule covers more than one
+finding, lists everything it covered.
 
 Accepting is not hiding. The finding is still reported, still counted in the
 severity totals, and named in the run alongside its reason — it simply stops

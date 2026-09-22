@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 CONFIG_FILENAME = "veritas.yaml"
 RUNS_DIRNAME = ".veritas"
@@ -66,7 +66,14 @@ class AcceptedRisk(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    id: str
+    # Match by exact identity, or by where and what kind of problem it is.
+    # The id is precise but brittle: it is derived from the finding's title, so
+    # a judge rewording the same problem after the artifact changes produces a
+    # new id. category/location survive that, at the cost of being broader.
+    id: str | None = None
+    category: str | None = None
+    location: str | None = None
+
     reason: str
     expires: date | None = None
 
@@ -80,8 +87,45 @@ class AcceptedRisk(BaseModel):
             )
         return value
 
+    @model_validator(mode="after")
+    def _must_match_something(self) -> AcceptedRisk:
+        if not (self.id or self.category or self.location):
+            raise ValueError(
+                "an accepted risk needs an id, a category or a location to match; "
+                "one with no criteria would accept every finding"
+            )
+        return self
+
+    @property
+    def label(self) -> str:
+        """How this rule is named in reports."""
+        if self.id:
+            return self.id
+        parts = []
+        if self.category:
+            parts.append(f"category={self.category}")
+        if self.location:
+            parts.append(f"location={self.location}")
+        return " ".join(parts)
+
     def active_on(self, today: date) -> bool:
         return self.expires is None or self.expires >= today
+
+    def matches(self, finding_category: str, finding_location: str | None, key: str) -> bool:
+        """Whether this rule covers a finding. Every criterion given must hold."""
+        if self.id and key != self.id:
+            return False
+        if self.category:
+            wanted = self.category.strip().lower()
+            actual = finding_category.strip().lower()
+            # A prefix match lets `category: check` cover `check/tests`.
+            if actual != wanted and not actual.startswith(f"{wanted}/"):
+                return False
+        # Locations are prose citing several places, so this is a substring
+        # test rather than equality.
+        return not self.location or (
+            self.location.strip().lower() in (finding_location or "").lower()
+        )
 
 
 class GatePolicy(BaseModel):

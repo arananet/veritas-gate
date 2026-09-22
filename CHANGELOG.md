@@ -61,6 +61,12 @@ Guidelines:
   `gpt-5.6-terra`, `gemini-3.1-pro`. The OpenSpec template's own spec-review and
   issue-autofix agents were moved off their stale ids too. The example-paper test no longer names the default
   ids, so bumping a model cannot break it (spec: veritas-core-evaluation-engine).
+- `gate.accepted_risks` entries can match by `category` and `location` instead of by `id`.
+  The id is derived from the finding's title, so a judge rewording the same problem after
+  the artifact changes produced a new id and the acceptance went stale precisely when it
+  was needed. Every criterion given must match, a rule with no criteria is rejected, and
+  each run reports which findings every rule actually covered
+  (spec: veritas-core-evaluation-engine).
 - `gate.accepted_risks` carries findings that are correct but deliberately accepted, each
   with a reason and an optional expiry. An accepted finding stops blocking but is still
   reported and still counted; acceptances that match nothing or have expired are reported

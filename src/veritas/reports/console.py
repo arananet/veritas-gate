@@ -167,9 +167,16 @@ class ConsoleReporter:
         """Name what was carried deliberately, and what has gone stale."""
         if gate.accepted_risks:
             self.console.print(
-                f"[cyan]{len(gate.accepted_risks)} finding(s) accepted as known risk:[/cyan] "
-                + ", ".join(gate.accepted_risks)
+                f"[cyan]{len(gate.accepted_risks)} rule(s) accepted "
+                f"{len(gate.accepted_findings)} finding(s) as known risk:[/cyan]"
             )
+            for rule in gate.accepted_risks:
+                self.console.print(f"  [cyan]·[/cyan] {rule}")
+            if len(gate.accepted_findings) > len(gate.accepted_risks):
+                # A rule written by category can cover far more than intended.
+                self.console.print(
+                    "  [dim]covering: " + ", ".join(gate.accepted_findings) + "[/dim]"
+                )
         if gate.stale_accepted_risks:
             self.console.print(
                 f"[yellow]{len(gate.stale_accepted_risks)} accepted risk(s) match nothing "
