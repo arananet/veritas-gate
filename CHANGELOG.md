@@ -61,6 +61,10 @@ Guidelines:
   `gpt-5.6-terra`, `gemini-3.1-pro`. The OpenSpec template's own spec-review and
   issue-autofix agents were moved off their stale ids too. The example-paper test no longer names the default
   ids, so bumping a model cannot break it (spec: veritas-core-evaluation-engine).
+- `veritas files` shows exactly which files the judges would read, their sizes, and a
+  rough input-token count per judge — the cost of a run is decided by `artifact.paths`,
+  and it was previously only discoverable by paying for an evaluation
+  (spec: veritas-core-evaluation-engine).
 - `veritas init` writes a config that runs as-is: every provider and model comes from
   the environment, and `tls_verify` is present on each model role, so a machine behind a
   TLS-intercepting proxy does not have to hand-edit the file after generating it

@@ -14,6 +14,7 @@ from typing import Annotated, Any
 
 import typer
 from rich.console import Console
+from rich.table import Table
 
 from veritas import __version__
 from veritas.artifacts.base import Artifact
@@ -181,6 +182,79 @@ def profiles(
         console.print(f"[bold]{name}[/bold] v{loaded.version} — {loaded.definition.description}")
         console.print(f"  judges: {judges}")
         console.print(f"  path:   {directory}")
+
+
+@app.command()
+def files(
+    path: Annotated[Path, typer.Argument(help="Artifact path.")] = Path("."),
+    profile: Annotated[str | None, typer.Option(help="Profile name to use.")] = None,
+    config: Annotated[Path | None, typer.Option(help="Path to veritas.yaml.")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Emit JSON.")] = False,
+) -> None:
+    """Show exactly what the judges would read, and roughly what it costs.
+
+    Worth running before the first evaluation on a real project: every file
+    listed here is sent to every judge, so this is the difference between
+    evaluating your paper and evaluating your entire working directory.
+    """
+    target = path.resolve()
+    if not target.exists():
+        raise _fail(f"{target} does not exist")
+    loaded_config, loaded_profile = _prepare(target, profile, config)
+    artifact = _artifact_for(target, loaded_config, loaded_profile)
+    segments = artifact.segments()
+
+    judges = [spec.name for spec in loaded_profile.definition.judges if spec.enabled]
+    total_chars = sum(len(segment.text) for segment in segments)
+    # Deliberately rough, and rounded down in the wording: this is a sense of
+    # scale before spending money, not a billing estimate.
+    per_judge_tokens = total_chars // 4
+    limit = 24_000
+
+    if json_output:
+        console.print_json(
+            json.dumps(
+                {
+                    "artifact": str(target),
+                    "profile": loaded_profile.name,
+                    "paths": artifact.paths,
+                    "files": [
+                        {"path": segment.path, "characters": len(segment.text)}
+                        for segment in segments
+                    ],
+                    "judges": judges,
+                    "approximate_tokens_per_judge": per_judge_tokens,
+                }
+            )
+        )
+        return
+
+    console.print(f"Artifact: [bold]{target}[/bold]")
+    console.print(f"Profile:  [bold]{loaded_profile.name}[/bold]")
+    console.print(f"Paths:    {', '.join(artifact.paths)}")
+    console.print()
+
+    if not segments:
+        console.print("[yellow]No readable files matched.[/yellow]")
+        console.print("Veritas reads text formats only. Check artifact.paths in your veritas.yaml.")
+        raise typer.Exit(0)
+
+    table = Table(box=None, pad_edge=False)
+    table.add_column("File")
+    table.add_column("Characters", justify="right")
+    table.add_column("", style="yellow")
+    for segment in sorted(segments, key=lambda item: -len(item.text)):
+        size = len(segment.text)
+        note = f"truncated at {limit:,}" if size > limit else ""
+        table.add_row(segment.path, f"{size:,}", note)
+    console.print(table)
+    console.print()
+    console.print(f"{len(segments)} file(s), {total_chars:,} characters")
+    console.print(
+        f"Roughly {per_judge_tokens:,} input tokens [bold]per judge[/bold], "
+        f"and this profile runs {len(judges)} of them."
+    )
+    console.print("[dim]Skipped: binaries, PDFs and any format Veritas cannot read as text.[/dim]")
 
 
 @app.command()
