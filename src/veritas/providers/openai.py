@@ -28,6 +28,11 @@ class OpenAIProvider:
 
     name = "openai"
     default_api_key_env = "OPENAI_API_KEY"
+    # OpenAI's newer models reject `max_tokens` and require
+    # `max_completion_tokens`; self-hosted OpenAI-compatible servers mostly
+    # still only know `max_tokens`. Start with the one the endpoint most likely
+    # wants, and swap on the error that names the other.
+    token_field = "max_completion_tokens"
 
     def __init__(self, spec: ModelSpec) -> None:
         self.spec = spec
@@ -45,7 +50,7 @@ class OpenAIProvider:
         }
         payload: dict[str, Any] = {
             "model": self.spec.model,
-            "max_tokens": self.spec.max_tokens,
+            self.token_field: self.spec.max_tokens,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -64,17 +69,41 @@ class OpenAIProvider:
         payload.update(self.spec.extra)
 
         url = f"{base}/chat/completions"
-        try:
-            body = await post_json(self.spec, url, headers=headers, payload=payload)
-        except ProviderError as exc:
-            if not _rejects_json_schema(exc):
-                raise
-            payload["response_format"] = {"type": "json_object"}
-            body = await post_json(self.spec, url, headers=headers, payload=payload)
+        body = await self._post_with_fallbacks(url, headers, payload)
 
         raw = _extract_message(body)
         value = parse_structured(raw, schema)
         return StructuredResponse(value=value, usage=_usage(body), raw=raw)
+
+    async def _post_with_fallbacks(
+        self,
+        url: str,
+        headers: dict[str, str],
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        """POST, adapting to the two ways endpoints differ from each other.
+
+        Each fallback is applied at most once, and only in response to an error
+        that names the parameter it changes — so a genuine failure still
+        surfaces instead of being retried into something unrecognisable.
+        """
+        tried_token_swap = False
+        tried_json_object = False
+
+        while True:
+            try:
+                return await post_json(self.spec, url, headers=headers, payload=payload)
+            except ProviderError as exc:
+                message = str(exc).lower()
+                if not tried_token_swap and _rejects_token_field(message):
+                    tried_token_swap = True
+                    payload = _swap_token_field(payload)
+                    continue
+                if not tried_json_object and _rejects_json_schema(message):
+                    tried_json_object = True
+                    payload = {**payload, "response_format": {"type": "json_object"}}
+                    continue
+                raise
 
 
 class OpenAICompatibleProvider(OpenAIProvider):
@@ -82,11 +111,25 @@ class OpenAICompatibleProvider(OpenAIProvider):
 
     name = "openai-compatible"
     default_api_key_env = "OPENAI_COMPATIBLE_API_KEY"
+    token_field = "max_tokens"
 
 
-def _rejects_json_schema(exc: ProviderError) -> bool:
-    text = str(exc).lower()
-    return "json_schema" in text or "response_format" in text
+def _rejects_json_schema(message: str) -> bool:
+    return "json_schema" in message or "response_format" in message
+
+
+def _rejects_token_field(message: str) -> bool:
+    return "max_completion_tokens" in message or "max_tokens" in message
+
+
+def _swap_token_field(payload: dict[str, Any]) -> dict[str, Any]:
+    """Move the output-length limit to whichever field this endpoint accepts."""
+    swapped = dict(payload)
+    if "max_tokens" in swapped:
+        swapped["max_completion_tokens"] = swapped.pop("max_tokens")
+    elif "max_completion_tokens" in swapped:
+        swapped["max_tokens"] = swapped.pop("max_completion_tokens")
+    return swapped
 
 
 def _extract_message(body: dict[str, Any]) -> str:

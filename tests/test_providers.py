@@ -368,3 +368,72 @@ def test_an_ordinary_rate_limit_is_still_retried(serve, judge_payload) -> None:
     with serve(handler) as server:
         _run(build_provider(spec("openai", server.base_url, max_retries=3)), "s", "u")
     assert len(attempts) == 2
+
+
+def test_openai_sends_max_completion_tokens(serve, judge_payload) -> None:
+    """OpenAI's newer models reject `max_tokens`."""
+    seen: list[dict[str, Any]] = []
+
+    def handler(path: str, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+        seen.append(body)
+        return 200, {"choices": [{"message": {"content": json.dumps(judge_payload)}}]}
+
+    with serve(handler) as server:
+        _run(build_provider(spec("openai", server.base_url)), "s", "u")
+    assert seen[0]["max_completion_tokens"] == 16000
+    assert "max_tokens" not in seen[0]
+
+
+def test_openai_compatible_sends_max_tokens(serve, judge_payload) -> None:
+    """Self-hosted servers mostly only know the older field."""
+    import os
+
+    os.environ["OPENAI_COMPATIBLE_API_KEY"] = "test"
+    seen: list[dict[str, Any]] = []
+
+    def handler(path: str, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+        seen.append(body)
+        return 200, {"choices": [{"message": {"content": json.dumps(judge_payload)}}]}
+
+    with serve(handler) as server:
+        _run(build_provider(spec("openai-compatible", server.base_url)), "s", "u")
+    assert seen[0]["max_tokens"] == 16000
+    assert "max_completion_tokens" not in seen[0]
+
+
+def test_the_token_field_is_swapped_when_the_endpoint_rejects_it(serve, judge_payload) -> None:
+    """Regression: a 400 naming max_completion_tokens killed the whole judge."""
+    seen: list[dict[str, Any]] = []
+
+    def handler(path: str, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+        seen.append(body)
+        if "max_completion_tokens" in body:
+            return 400, {
+                "error": {
+                    "message": (
+                        "Unsupported parameter: 'max_completion_tokens' is not supported "
+                        "with this model. Use 'max_tokens' instead."
+                    ),
+                    "code": "unsupported_parameter",
+                }
+            }
+        return 200, {"choices": [{"message": {"content": json.dumps(judge_payload)}}]}
+
+    with serve(handler) as server:
+        _run(build_provider(spec("openai", server.base_url, max_retries=1)), "s", "u")
+    assert len(seen) == 2
+    assert seen[1]["max_tokens"] == 16000
+
+
+def test_each_fallback_is_attempted_only_once(serve) -> None:
+    """A genuine failure must surface, not loop through fallbacks forever."""
+    attempts: list[int] = []
+
+    def handler(path: str, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+        attempts.append(1)
+        return 400, {"error": {"message": "max_tokens and response_format are both wrong"}}
+
+    with serve(handler) as server, pytest.raises(ProviderError, match="400"):
+        _run(build_provider(spec("openai", server.base_url, max_retries=1)), "s", "u")
+    # One original attempt plus one of each fallback, then the error is raised.
+    assert len(attempts) == 3

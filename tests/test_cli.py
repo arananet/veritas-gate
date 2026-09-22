@@ -194,6 +194,11 @@ def test_init_writes_a_starter_config(
     config = (tmp_path / "veritas.yaml").read_text()
     assert "profile: generic-document" in config
     assert "allow: []" in config, "execution must be empty by default"
+    # The written config must run as-is on a machine that needs these, rather
+    # than failing and sending the user back to edit YAML by hand.
+    assert config.count("tls_verify: ${VERITAS_TLS_VERIFY:-true}") == 3
+    assert "${VERITAS_DEFAULT_PROVIDER:-anthropic}" in config
+    assert "sk-" not in config, "no credential may ever be written into a config"
     assert (tmp_path / ".veritas" / "runs").is_dir()
 
     again = runner.invoke(app, ["init", str(tmp_path), "--profile", "generic-document"])

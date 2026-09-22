@@ -61,6 +61,14 @@ Guidelines:
   `gpt-5.6-terra`, `gemini-3.1-pro`. The OpenSpec template's own spec-review and
   issue-autofix agents were moved off their stale ids too. The example-paper test no longer names the default
   ids, so bumping a model cannot break it (spec: veritas-core-evaluation-engine).
+- `veritas init` writes a config that runs as-is: every provider and model comes from
+  the environment, and `tls_verify` is present on each model role, so a machine behind a
+  TLS-intercepting proxy does not have to hand-edit the file after generating it
+  (spec: veritas-core-evaluation-engine).
+- The OpenAI adapter sends `max_completion_tokens`, which newer OpenAI models require,
+  and swaps to `max_tokens` when an endpoint rejects it. `openai-compatible` starts from
+  `max_tokens`, which is what most self-hosted servers accept. Each fallback is attempted
+  once, so a genuine failure still surfaces (spec: veritas-core-evaluation-engine).
 - `temperature` is omitted from a request unless it is explicitly configured, and the
   default `max_tokens` is now 16000. Current Claude models reject `temperature` with a
   400, so every judge failed against them (spec: veritas-core-evaluation-engine).
