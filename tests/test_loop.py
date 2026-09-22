@@ -401,3 +401,67 @@ def test_every_stop_reason_has_human_readable_text(reason: StopReason) -> None:
     from veritas.models.loop import STOP_REASON_TEXT
 
     assert STOP_REASON_TEXT[reason].strip()
+
+
+# ------------------------------------------- deferring a human decision
+
+
+async def test_mechanical_findings_are_repaired_before_stopping_for_a_human(
+    tmp_path: Path,
+) -> None:
+    """The common real case: many mechanical findings and one design question.
+
+    Stopping at the first human decision delivered nothing and left the human
+    deciding against a noisier artifact.
+    """
+    agent = MockRepairAgent()
+    orchestrator, workspace, artifact = make_loop(
+        tmp_path,
+        [revise([repairable("A-1"), needs_experiment()], blocking=["A-1", "E-1"])],
+        agent=agent,
+    )
+    result = await orchestrator.run(artifact, workspace)
+
+    assert result.stop_reason is StopReason.HUMAN_DECISION_REQUIRED
+    assert result.human_decisions
+    # The mechanical work happened.
+    assert agent.seen_plans
+    dispatched = [action for plan in agent.seen_plans for action in plan.actions]
+    # ...and the human-blocked action was still never dispatched.
+    assert all(not action.requires_human_approval for action in dispatched)
+    assert "repaired first" in result.stop_detail
+
+
+async def test_stop_mode_preserves_the_previous_behaviour(tmp_path: Path) -> None:
+    agent = MockRepairAgent()
+    orchestrator, workspace, artifact = make_loop(
+        tmp_path,
+        [revise([repairable("A-1"), needs_experiment()], blocking=["A-1", "E-1"])],
+        agent=agent,
+        config=LoopConfig(on_human_decision="stop"),
+    )
+    result = await orchestrator.run(artifact, workspace)
+
+    assert result.stop_reason is StopReason.HUMAN_DECISION_REQUIRED
+    assert agent.seen_plans == []
+
+
+async def test_a_human_only_plan_dispatches_nothing_when_deferring(tmp_path: Path) -> None:
+    """Deferring must not invent autonomous work where there is none."""
+    agent = MockRepairAgent()
+    orchestrator, workspace, artifact = make_loop(
+        tmp_path, [revise([needs_experiment()], blocking=["E-1"])], agent=agent
+    )
+    result = await orchestrator.run(artifact, workspace)
+    assert result.stop_reason is StopReason.HUMAN_DECISION_REQUIRED
+    assert agent.seen_plans == []
+
+
+async def test_a_deferred_decision_is_marked_for_review_exactly_once(tmp_path: Path) -> None:
+    orchestrator, workspace, artifact = make_loop(
+        tmp_path,
+        [revise([repairable("A-1"), needs_experiment()], blocking=["A-1", "E-1"])],
+    )
+    result = await orchestrator.run(artifact, workspace)
+    reviewed = [item for item in result.ledger if item.status == "HUMAN_REVIEW"]
+    assert len(reviewed) == len({item.id for item in reviewed})

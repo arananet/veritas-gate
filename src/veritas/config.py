@@ -301,6 +301,14 @@ class LoopConfig(BaseModel):
     stop_on_new_critical: bool = True
     stop_on_regression: bool = True
     accept_warnings: bool = True
+    # What to do when a finding needs a human decision:
+    #   "defer" — repair the mechanical findings first, then stop and report the
+    #             decisions. Each pass leaves less noise, and the human is asked
+    #             against a cleaner artifact.
+    #   "stop"  — stop immediately, repairing nothing. For an unattended run
+    #             where halting at the first human decision is the point.
+    # Neither mode ever dispatches a human-blocked action to a repair agent.
+    on_human_decision: Literal["defer", "stop"] = "defer"
     max_cost_usd: float | None = None
     max_changed_files: int | None = 25
 

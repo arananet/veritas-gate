@@ -1,0 +1,67 @@
+---
+title: Repair what is mechanical before stopping for a human decision
+slug: deferred-human-decisions
+type: feature
+status: review
+author: Claude
+created_at: '2026-09-22'
+updated_at: '2026-09-22'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  A single finding needing a human decision currently stops the whole loop
+  before any repair happens. On a real artifact that is the common case: an
+  evaluation returns fifteen mechanical findings and one design question, and
+  the loop delivers nothing. The operator is left doing by hand the work the
+  loop was built to do, and the human decision is no better informed for it.
+
+  The loop now runs the autonomous actions first and stops afterwards, carrying
+  the human decisions with it. What a human is asked to decide is unchanged;
+  what changes is that they are asked once the mechanical work is already done,
+  against a cleaner artifact.
+
+  The safety invariant is untouched. An action the planner marked as requiring
+  a human is never dispatched to a repair agent, in either mode. Nothing that
+  needs new evidence is ever fabricated. The only thing that changes is whether
+  unrelated mechanical work happens before the loop stops.
+
+  The behaviour is configurable because there are contexts — an unattended CI
+  run gating a release — where stopping at the first sign of a human decision is
+  the point. `stop` preserves the previous behaviour exactly.
+acceptance_criteria:
+- "Given a plan with both autonomous actions and actions requiring a human decision, when the loop runs in the default mode, then the autonomous actions are repaired and the loop then stops reporting the human decisions."
+- "Given the same plan, when the loop is configured to stop on a human decision, then no repair is dispatched and the loop stops immediately, as it did before."
+- "Given a plan whose actions all require a human decision, when the loop runs in either mode, then no repair is dispatched and the loop stops reporting them."
+- "Given an action marked as requiring a human decision, when the loop runs in any mode, then that action is never dispatched to a repair agent."
+- "Given deferred human decisions, when the loop stops, then the stop reason is that a human decision is required and the result names every deferred action."
+- "Given deferred human decisions, when the ledger is written, then those findings are marked as awaiting human review exactly once, whether or not autonomous repair ran first."
+- "Given a run that repaired autonomously and then stopped for a human decision, when the result is reported, then it states both what was repaired and what is waiting."
+test_plan:
+- 'Unit test: a plan with both kinds of action repairs the autonomous ones and stops with human_decision_required.'
+- 'Unit test: the same plan under stop mode dispatches no repair.'
+- 'Unit test: a plan with only human actions dispatches no repair in either mode.'
+- 'Unit test: no action carrying requires_human_approval reaches the repair agent in either mode.'
+- 'Unit test: the ledger marks deferred findings for human review once, not twice.'
+- 'Unit test: the iteration budget still bounds a run that defers a decision every iteration.'
+- 'Integration test: a loop over an artifact with mixed findings produces repaired files and a human-decision stop reason.'
+qa_notes: |
+  This changes the default. A run that previously stopped doing nothing now
+  performs the mechanical repairs first. Operators who relied on the loop
+  halting at the first human decision set `on_human_decision: stop`.
+out_of_scope:
+- Letting a repair agent act on an action that requires a human decision, in any mode.
+- Asking a model to decide whether a human decision is really needed; the planner's classification is deterministic.
+- Resuming automatically once a human has decided; that remains a fresh `--resume`.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - An evaluation with fifteen mechanical findings and one design question repairs fifteen and asks about one.
+  metrics: []
+technical_notes: |
+  The change is one branch in the orchestrator's PLAN phase: deferring the human
+  stop until after REPAIR and MEASURE rather than breaking immediately. The
+  planner's classification is untouched, so what counts as needing a human is
+  decided exactly where it was before.
