@@ -246,21 +246,45 @@ class LoopReporter:
         if result.workspace and result.mode == "autopilot":
             self.console.print()
             if result.files_changed:
-                # Veritas never applies a repair to your tree: the repairer
-                # proposes, you accept. Saying where the changes are is not
-                # enough -- say how to read them and how to take them.
-                self.console.print(
-                    f"[bold]{len(result.files_changed)} file(s) were changed, "
-                    "in a workspace, not in your tree.[/bold]"
-                )
-                self.console.print()
-                self.console.print("  Review them:")
-                self.console.print(f"    git -C {result.workspace} diff")
-                self.console.print()
-                self.console.print("  Take them:")
-                self.console.print(f"    git -C {result.workspace} diff | git apply")
+                self._how_to_apply(result)
             else:
                 self.console.print(f"Workspace:\n  {result.workspace}")
+
+    def _how_to_apply(self, result: LoopResult) -> None:
+        """Say how to read the repair and how to take it, in full or in part.
+
+        Veritas never writes to your tree: the repairer proposes, you accept.
+        Naming the workspace is not enough -- the commands are what an operator
+        actually needs, and accepting only some of a repair is the common case,
+        not the exception.
+        """
+        workspace = result.workspace
+        files = result.files_changed
+        self.console.print(
+            f"[bold]{len(files)} file(s) changed, in a workspace, not in your tree:[/bold]"
+        )
+        for path in files:
+            self.console.print(f"  [dim]{path}[/dim]")
+        self.console.print()
+        self.console.print("  Review the whole repair:")
+        self._command(f"git -C {workspace} diff")
+        self.console.print()
+        self.console.print("  Review one file:")
+        self._command(f"git -C {workspace} diff -- {files[0]}")
+        self.console.print()
+        self.console.print("  Take all of it (run from your repository root):")
+        self._command(f"git -C {workspace} diff | git apply")
+        if len(files) > 1:
+            self.console.print()
+            self.console.print("  Take only the files you accept:")
+            kept = " ".join(files[:2])
+            self._command(f"git -C {workspace} diff -- {kept} | git apply")
+        self.console.print()
+        self.console.print("  [dim]Nothing is applied until you run one of these.[/dim]")
+
+    def _command(self, text: str) -> None:
+        """Print a command unwrapped: a path broken across lines cannot be pasted."""
+        self.console.print(f"    [cyan]{text}[/cyan]", soft_wrap=True)
 
     def plan_preview(self, plan: RepairPlan) -> None:
         """Print a plan without applying it (assist mode and dry runs)."""

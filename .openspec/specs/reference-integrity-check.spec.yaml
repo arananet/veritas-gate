@@ -42,6 +42,10 @@ acceptance_criteria:
 - "Given a target document that cannot be read, when the check runs, then the check reports an error rather than passing."
 - "Given no documents configured, when the check runs, then it is skipped rather than passing vacuously."
 - "Given a configured severity, when a finding is reported, then it carries that severity."
+- "Given a dotted token in inline code that is a version, an identifier or a package name rather than a path, when the check runs, then it is not reported."
+- "Given a slashed token in inline code whose first segment names nothing in the repository, such as an upstream owner and repository, when the check runs, then it is not reported."
+- "Given several citations to one path that exists but was not supplied, when findings are reported, then they are one finding naming the single configuration line that fixes them all."
+- "Given citations to different unsupplied paths, when findings are reported, then each path is its own finding."
 test_plan:
 - 'Unit test: a resolvable relative link produces no finding.'
 - 'Unit test: a link to a path that exists nowhere is reported as unresolved, naming the line.'
@@ -49,6 +53,9 @@ test_plan:
 - 'Unit test: http and https links are ignored.'
 - 'Unit test: bare anchors are ignored.'
 - 'Unit test: both Markdown link syntax and inline code paths are considered.'
+- 'Unit test: versions, dotted identifiers and LaTeX package names in inline code are not reported.'
+- 'Unit test: an upstream owner/repository token in inline code is not reported.'
+- 'Unit test: repeated citations to one unsupplied path are one finding; different paths stay separate.'
 - 'Unit test: a directory target resolves as well as a file target.'
 - 'Unit test: an unreadable target document produces an error result.'
 - 'Unit test: no configured documents yields a skipped result.'
@@ -71,3 +78,8 @@ technical_notes: |
   so the class of error it covers cannot survive a single round. That is the
   division the project already draws — deterministic where a rule settles it,
   a judge where it does not.
+
+  A check that cries wolf is worse than none: it sends a repair agent
+  chasing ghosts and buries the findings that matter. Inline code is held
+  to a stricter test than a Markdown link, because a link to a relative
+  path is unambiguous and a slashed token in prose is not.

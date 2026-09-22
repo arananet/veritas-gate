@@ -330,3 +330,76 @@ def test_a_completed_repair_prints_no_reasons() -> None:
     output = console.export_text()
     assert "all done" not in output
     assert "✓" in output
+
+
+def _finished(files: list[str]):
+    from datetime import UTC, datetime
+
+    from veritas.models.loop import LoopResult, StopReason
+
+    return LoopResult(
+        loop_id="l",
+        profile="p",
+        artifact_id="a",
+        mode="autopilot",
+        started_at=datetime.now(UTC),
+        stop_reason=StopReason.HUMAN_DECISION_REQUIRED,
+        stop_detail="stopped.",
+        files_changed=files,
+        workspace="/tmp/ws",
+    )
+
+
+def test_the_summary_prints_the_commands_to_review_and_apply() -> None:
+    """Veritas never writes to your tree, so the commands are what you need."""
+    from rich.console import Console
+
+    from veritas.reports.loop import LoopReporter
+
+    console = Console(width=200, record=True)
+    LoopReporter(console).summary(_finished(["a.md", "b.md"]))
+    out = console.export_text()
+
+    assert "git -C /tmp/ws diff" in out
+    assert "git -C /tmp/ws diff | git apply" in out
+    # Accepting only part of a repair is the common case, not the exception.
+    assert "git -C /tmp/ws diff -- a.md b.md | git apply" in out
+    assert "Nothing is applied until you run one of these." in out
+
+
+def test_a_single_changed_file_offers_no_partial_apply() -> None:
+    from rich.console import Console
+
+    from veritas.reports.loop import LoopReporter
+
+    console = Console(width=200, record=True)
+    LoopReporter(console).summary(_finished(["only.md"]))
+    out = console.export_text()
+    assert "Take all of it" in out
+    assert "Take only the files you accept" not in out
+
+
+def test_a_repair_that_changed_nothing_offers_no_apply_commands() -> None:
+    from rich.console import Console
+
+    from veritas.reports.loop import LoopReporter
+
+    console = Console(width=200, record=True)
+    LoopReporter(console).summary(_finished([]))
+    out = console.export_text()
+    assert "git apply" not in out
+    assert "Workspace:" in out
+
+
+def test_a_long_workspace_path_is_not_wrapped_mid_command() -> None:
+    """A path broken across lines cannot be pasted, which is the whole point."""
+    from rich.console import Console
+
+    from veritas.reports.loop import LoopReporter
+
+    result = _finished(["paper/manuscript.md"])
+    result.workspace = "/Users/someone/Scripts/a-long-project-name/.veritas/workspaces/loop-x"
+    console = Console(width=60, record=True)
+    LoopReporter(console).summary(result)
+    out = console.export_text()
+    assert f"git -C {result.workspace} diff" in out
