@@ -237,3 +237,27 @@ def test_an_unreachable_provider_never_reports_a_pass(tmp_path: Path, repo_root)
     gate = json.loads((run_dir / "gate.json").read_text())
     assert gate["status"] == "FAIL"
     assert sorted(gate["judge_errors"]) == ["adversarial", "evidence", "structure"]
+
+
+def test_files_lists_what_the_judges_would_read(tmp_path: Path, repo_root) -> None:
+    """The cost of a run is decided here, so it must be inspectable first."""
+    project = write_project(tmp_path, "http://127.0.0.1:1", repo_root, max_major=0)
+    (project / "notes.bin").write_bytes(b"\x00\x01binary")
+    (project / "paper.pdf").write_bytes(b"%PDF-1.4")
+
+    result = runner.invoke(app, ["files", str(project), "--json"])
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert [item["path"] for item in payload["files"]] == ["doc.md"]
+    assert payload["judges"] == ["structure", "evidence", "adversarial"]
+    assert payload["approximate_tokens_per_judge"] > 0
+
+
+def test_files_says_so_when_nothing_matches(tmp_path: Path, repo_root) -> None:
+    project = write_project(tmp_path, "http://127.0.0.1:1", repo_root, max_major=0)
+    (project / "veritas.yaml").write_text(
+        (project / "veritas.yaml").read_text().replace("- doc.md", "- absent")
+    )
+    result = runner.invoke(app, ["files", str(project)])
+    assert result.exit_code == 0
+    assert "No readable files matched" in result.stdout

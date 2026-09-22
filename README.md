@@ -441,6 +441,7 @@ spots do not decide the outcome.
 | Command | Purpose |
 | --- | --- |
 | `veritas init` | Write `veritas.yaml` and `.veritas/` |
+| `veritas files` | Show what the judges would read, and roughly what it costs |
 | `veritas evaluate <path>` | Run the evaluation and write an immutable run |
 | `veritas evaluate . --profile <name>` | Evaluate under a specific profile |
 | `veritas evaluate . --judge evidence --runs 3` | Calibrate one judge and record its stability |
