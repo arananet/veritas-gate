@@ -150,6 +150,31 @@ class GatePolicy(BaseModel):
     accepted_risks: list[AcceptedRisk] = Field(default_factory=list)
 
 
+class ContentPattern(BaseModel):
+    """A regular expression the artifact's text is checked against.
+
+    ``description`` is what a reader is told when it fails, so it should say
+    what was expected rather than restate the expression.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    pattern: str
+    description: str = ""
+
+    @field_validator("pattern")
+    @classmethod
+    def _must_compile(cls, value: str) -> str:
+        try:
+            re.compile(value)
+        except re.error as exc:
+            raise ValueError(f"invalid regular expression {value!r}: {exc}") from exc
+        return value
+
+    def label(self) -> str:
+        return self.description.strip() or self.pattern
+
+
 class CheckConfig(BaseModel):
     """One deterministic check instance."""
 
@@ -164,6 +189,12 @@ class CheckConfig(BaseModel):
     required_paths: list[str] = Field(default_factory=list)
     required_sections: list[str] = Field(default_factory=list)
     target: str | None = None
+    # For the content-patterns check: regular expressions that must appear in
+    # the target, and ones that must not. A citation to a mutable branch is as
+    # much a defect as a missing DOI, so both directions are needed.
+    required_patterns: list[ContentPattern] = Field(default_factory=list)
+    forbidden_patterns: list[ContentPattern] = Field(default_factory=list)
+    case_sensitive: bool = False
 
 
 class ExecutionConfig(BaseModel):

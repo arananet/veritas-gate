@@ -1,0 +1,62 @@
+---
+title: Archival, citability and provenance evaluation
+slug: archival-and-citability
+type: feature
+status: review
+author: Claude
+created_at: '2026-09-22'
+updated_at: '2026-09-22'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  A paper can be methodologically sound and still be uncitable and
+  unarchivable: referenced by a mutable URL that will rot, carrying no DOI, no
+  citation metadata, and no statement of where its data lives. Today Veritas
+  catches this only when an adversarial judge happens to notice.
+
+  Two additions. A `content-patterns` check asserts that a target document
+  contains (or does not contain) configured patterns — deterministic, free, and
+  reusable by any profile: a DOI, a pinned commit rather than a branch, a data
+  availability statement. And an `archival` judge in the scientific-paper
+  profile evaluates what needs judgement: whether the DOI identifies the
+  version the paper describes, whether code and data licences are coherent,
+  whether an availability statement is substantive or ceremonial, and whether
+  reported analysis matches any preregistration.
+
+  The division is the existing one: deterministic where a regular expression
+  settles it, a judge where it does not.
+acceptance_criteria:
+- "Given a check of type content-patterns with a target and required patterns, when a pattern is absent from the target, then a finding is reported naming the pattern and the target, and the check fails."
+- "Given a content-patterns check with forbidden patterns, when one is present, then a finding is reported quoting the matching line."
+- "Given a target that does not exist or has no readable text, when the check runs, then it reports an error result rather than passing silently."
+- "Given a pattern list and a target containing all of them, when the check runs, then it passes and reports no findings."
+- "Given an invalid regular expression in the configuration, when the check runs, then it reports a configuration error naming the pattern rather than raising."
+- "Given the scientific-paper profile, when it is loaded, then it declares an archival judge whose prompt covers DOI and version identity, licence coherence, data availability, reference immutability and preregistration agreement."
+- "Given the archival judge, when it evaluates an artifact, then its findings follow the same structured schema as every other judge and cite evidence from the artifact."
+test_plan:
+- 'Unit test: content-patterns reports missing required patterns, present forbidden patterns, a passing case, a missing target, and an invalid regular expression.'
+- 'Unit test: patterns are matched case-insensitively by default and case-sensitively when configured.'
+- 'Unit test: the check reports the line number and text of a forbidden match, so the finding is actionable.'
+- 'Unit test: the scientific-paper profile declares the archival judge and its prompt file exists and is non-empty.'
+- 'Integration test: a profile configured with content-patterns runs end to end through the engine and its findings reach the gate.'
+qa_notes: |
+  The check contacts no provider and costs nothing to run, so it is suitable as
+  a required check in CI. The archival judge is an ordinary LLM judge and costs
+  what any other judge costs.
+out_of_scope:
+- Resolving a DOI over the network to verify it exists; the check is offline and the judge reasons from the artifact only.
+- Generating CITATION.cff or Zenodo metadata; Veritas evaluates, it does not author.
+- A preregistration format; the judge compares against whatever preregistration the artifact contains.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - A manuscript citing a repository by branch rather than by commit is reported.
+  metrics: []
+technical_notes: |
+  content-patterns joins required-paths and required-sections as a check type
+  needing no subprocess, so it stays outside the execution allow-list.
+linked_issues: []
+linked_prs: []

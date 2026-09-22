@@ -61,6 +61,17 @@ Guidelines:
   `gpt-5.6-terra`, `gemini-3.1-pro`. The OpenSpec template's own spec-review and
   issue-autofix agents were moved off their stale ids too. The example-paper test no longer names the default
   ids, so bumping a model cannot break it (spec: veritas-core-evaluation-engine).
+- A `content-patterns` check asserts that a target's text matches, or avoids, configured
+  regular expressions — a DOI, a data availability statement, a citation to a mutable
+  branch rather than a pinned commit. Deterministic, contacts no provider, and reusable by
+  any profile. Invalid expressions are rejected when configuration loads, a forbidden match
+  quotes the line it found, and an unreadable target is an error rather than a pass
+  (spec: archival-and-citability).
+- The scientific-paper profile gained an `archival` judge covering persistent identifiers
+  and version identity, reference immutability, citation metadata, licence coherence
+  across code and data, data availability, and agreement with any preregistration. It
+  ships with a matching `citability` check, disabled by default because these are
+  conventions rather than universal requirements (spec: archival-and-citability).
 - `gate.accepted_risks` entries can match by `category` and `location` instead of by `id`.
   The id is derived from the finding's title, so a judge rewording the same problem after
   the artifact changes produced a new id and the acceptance went stale precisely when it
