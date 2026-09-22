@@ -510,18 +510,24 @@ pricing:                            # optional; without it you get tokens only
     gpt-5: {input_per_million: 1.25, output_per_million: 10.0}
 ```
 
-Four check types, three of which run nothing:
+Five check types, four of which run nothing:
 
 | Type | What it asserts | Runs a subprocess |
 | --- | --- | --- |
 | `required-paths` | Configured paths exist in the artifact | no |
 | `required-sections` | A target document contains configured sections | no |
 | `content-patterns` | A target's text matches, or avoids, regular expressions | no |
+| `reference-integrity` | Every relative path a document cites resolves | no |
 | `command` | An allow-listed command exits zero | yes |
 
 `content-patterns` is how a profile asserts what a regular expression can
 settle — that a manuscript names a DOI, or cites a commit rather than a branch
-that will move. See [`docs/PROFILES.md`](docs/PROFILES.md).
+that will move. `reference-integrity` resolves every relative path a document
+cites, and separates a citation to something that does not exist from one to
+something that exists but was never supplied in `artifact.paths` — the first
+means the document is wrong, the second that the configuration is. See
+[`docs/PROFILES.md`](docs/PROFILES.md) and
+[`docs/EVALUABLE_ARTIFACTS.md`](docs/EVALUABLE_ARTIFACTS.md).
 
 Model ids are never hard-coded. Copy `.env.example`, choose your models, and
 point each judge role at whichever provider you want. The adversarial reviewer
@@ -710,6 +716,7 @@ and [`CONTRIBUTING.md`](CONTRIBUTING.md) for the contributor checklist.
 | End-to-end walkthrough | [`docs/END_TO_END.md`](docs/END_TO_END.md) |
 | The repair loop | [`docs/LOOP.md`](docs/LOOP.md) |
 | Writing a profile | [`docs/PROFILES.md`](docs/PROFILES.md) |
+| Making an artifact evaluable | [`docs/EVALUABLE_ARTIFACTS.md`](docs/EVALUABLE_ARTIFACTS.md) |
 | Spec-driven workflow | [`docs/OPENSPEC.md`](docs/OPENSPEC.md) |
 | Small-project adoption | [`docs/ADOPTION.md`](docs/ADOPTION.md) |
 | Branch protection setup | [`docs/BRANCH_PROTECTION.md`](docs/BRANCH_PROTECTION.md) |

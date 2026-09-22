@@ -1,0 +1,73 @@
+---
+title: Check that what a document cites is actually there
+slug: reference-integrity-check
+type: feature
+status: review
+author: Claude
+created_at: '2026-09-22'
+updated_at: '2026-09-22'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  A manuscript cited an evidence directory that did not exist. Eight LLM judges
+  found it, across three evaluations, at roughly three quarters of a million
+  tokens each — to answer a question a regular expression and a stat call settle
+  for nothing. Worse, each repair pointed the citation at a freshly generated
+  directory whose name changed again on the next run, so the loop kept fixing
+  what the next iteration reintroduced.
+
+  A `reference-integrity` check resolves every relative path a document cites and
+  reports the ones that do not resolve. Judges are then spent on what needs
+  judgement.
+
+  It separates two outcomes that look identical in a judge's report and are not
+  the same problem at all, which cost a day to tell apart by hand:
+
+  - the target does not exist on disk — a genuine dangling reference, and the
+    document is wrong;
+  - the target exists but was never supplied to Veritas, because `artifact.paths`
+    does not include it — the document is right and the *configuration* is wrong.
+
+  Reported as one finding, the second sends an author rewriting correct prose to
+  match a truth Veritas could not see. Named apart, it is a one-line fix.
+acceptance_criteria:
+- "Given a document citing a relative path that resolves to an existing file or directory, when the check runs, then no finding is reported for it."
+- "Given a document citing a relative path that exists nowhere in the repository, when the check runs, then a finding names the citing document, the line, and the unresolved target."
+- "Given a document citing a path that exists on disk but is not within the artifact's supplied paths, when the check runs, then the finding says the artifact configuration omits it and names the path to add, distinctly from a dangling reference."
+- "Given a citation to an external URL, when the check runs, then it is ignored, because resolving it is not this check's job."
+- "Given a citation to an anchor or fragment within the same document, when the check runs, then it is ignored."
+- "Given a target document that cannot be read, when the check runs, then the check reports an error rather than passing."
+- "Given no documents configured, when the check runs, then it is skipped rather than passing vacuously."
+- "Given a configured severity, when a finding is reported, then it carries that severity."
+test_plan:
+- 'Unit test: a resolvable relative link produces no finding.'
+- 'Unit test: a link to a path that exists nowhere is reported as unresolved, naming the line.'
+- 'Unit test: a link to a path present on disk but outside artifact.paths is reported as a configuration omission, with different wording from a dangling reference.'
+- 'Unit test: http and https links are ignored.'
+- 'Unit test: bare anchors are ignored.'
+- 'Unit test: both Markdown link syntax and inline code paths are considered.'
+- 'Unit test: a directory target resolves as well as a file target.'
+- 'Unit test: an unreadable target document produces an error result.'
+- 'Unit test: no configured documents yields a skipped result.'
+qa_notes: |
+  The check reads the filesystem to distinguish a missing target from an
+  unsupplied one. It reads nothing outside the repository root and executes
+  nothing, so it stays outside the execution allow-list.
+out_of_scope:
+- Resolving URLs over the network.
+- Verifying that a resolved target contains what the citing sentence claims; that is a judge's work.
+- Rewriting or repairing a broken reference.
+- Enforcing a naming convention for regenerated evidence directories; the check reports breakage, it does not dictate layout.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - A manuscript citing a regenerated evidence directory by a name that changed is reported in under a second.
+  metrics: []
+technical_notes: |
+  Cheap where it matters: a check that costs nothing runs on every evaluation,
+  so the class of error it covers cannot survive a single round. That is the
+  division the project already draws — deterministic where a rule settles it,
+  a judge where it does not.
