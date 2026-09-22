@@ -111,26 +111,44 @@ def init(
 
 
 def _starter_config(profile: str) -> str:
+    """The config `veritas init` writes.
+
+    Every provider and model comes from the environment, so one `.env` drives
+    every project. Nothing here is a secret: only variable names and policy.
+    """
     return f"""\
 version: 1
 
 profile: {profile}
 
 artifact:
+  # What the judges read. Point this at the manuscript, the implementation and
+  # the evidence behind your numbers: a claim whose supporting file is not
+  # listed here cannot be verified, and will be reported as unverified.
   paths:
     - .
 
 # Secrets never live here. Only environment variable names and model ids do.
+# Copy .env.example from the Veritas repository and set the values there.
 models:
   default:
-    provider: anthropic
+    provider: ${{VERITAS_DEFAULT_PROVIDER:-anthropic}}
     model: ${{VERITAS_DEFAULT_MODEL}}
+    tls_verify: ${{VERITAS_TLS_VERIFY:-true}}
+
+  # A different vendor on purpose, so one model's blind spots do not decide the
+  # outcome. Point it at the default provider if you only have one key.
   adversarial:
-    provider: openai
+    provider: ${{VERITAS_ADVERSARIAL_PROVIDER:-openai}}
     model: ${{VERITAS_ADVERSARIAL_MODEL}}
+    tls_verify: ${{VERITAS_TLS_VERIFY:-true}}
+
+  # Consolidates the other judges' results. Optional: without it the meta
+  # review still runs, deterministically, and only the narrative summary is lost.
   meta:
-    provider: google
+    provider: ${{VERITAS_META_PROVIDER:-google}}
     model: ${{VERITAS_META_MODEL}}
+    tls_verify: ${{VERITAS_TLS_VERIFY:-true}}
 
 gate:
   fail_on:
