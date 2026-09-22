@@ -1,0 +1,62 @@
+---
+title: A repair agent that changes nothing is a failure, not a quiet partial
+slug: repair-agent-no-op-detection
+type: bugfix
+status: review
+author: Claude
+created_at: '2026-09-22'
+updated_at: '2026-09-22'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  A misconfigured repair command — a prompt passed as a file path instead of its
+  text, a sandbox that forbids writing, an agent waiting for an approval nobody
+  will give — exits zero and changes nothing. Veritas recorded that as `partial`,
+  the loop carried on, and the run reported that forty-one actions had been
+  repaired when not one file had changed. The operator was told work had happened
+  that had not.
+
+  An agent handed a non-empty plan that changes no file did not repair anything.
+  That is a failure, and it stops the loop with the command, its exit code and
+  the tail of its output, so the cause is visible rather than inferred.
+
+  The stop message is corrected too: it reports what actually happened —
+  how many files changed — instead of assuming that every dispatched action
+  succeeded.
+acceptance_criteria:
+- "Given a repair agent that exits zero and changes no file, when the plan had at least one action, then the result status is failed and the note names the command and its exit code."
+- "Given that failure, when the loop is running, then it stops with the repair-failure reason rather than continuing to the next iteration."
+- "Given a repair agent that exits zero and changes files, when the result is recorded, then its status is completed, as before."
+- "Given a repair agent that wrote its own result file, when it reports success but changed no file, then the recorded status is failed, because the changed-file list comes from the filesystem and not from the agent's claim."
+- "Given a plan with no actions at all, when the agent is not dispatched, then no no-op failure is reported."
+- "Given a run that deferred a human decision, when the loop stops, then the message states the number of files actually changed rather than the number of actions dispatched."
+- "Given a repair whose status is not completed, when the console reports it, then the failure is stated in words, not only as a symbol beside each action id."
+test_plan:
+- 'Unit test: an agent exiting zero with no filesystem change and a non-empty plan yields status failed.'
+- 'Unit test: the failure note contains the command and the exit code.'
+- 'Unit test: an agent exiting zero having changed a file still yields completed.'
+- 'Unit test: an agent-written result claiming success with no filesystem change is recorded as failed.'
+- 'Unit test: the loop stops with REPAIR_FAILURE on a no-op repair rather than iterating.'
+- 'Unit test: the deferred-decision stop message reports changed files, and says none were changed when that is so.'
+- 'Integration test: a loop whose configured command is a true no-op stops with a failure naming the command.'
+qa_notes: |
+  This turns a silent non-event into a loud stop. A repair command that
+  legitimately has nothing to do should not be dispatched: the planner only
+  dispatches a non-empty plan, so an agent reached with actions and changing
+  nothing has failed to carry them out.
+out_of_scope:
+- Diagnosing why a particular agent changed nothing; Veritas reports the command, exit code and output and stops.
+- Retrying a failed repair with different arguments.
+- Validating a repair command's flags before running it.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - A repair command whose prompt is passed as a path rather than text stops the loop naming its exit code.
+  metrics: []
+technical_notes: |
+  The changed-file list is already read from the workspace rather than from the
+  agent's own report, so the no-op check applies equally to an agent that writes
+  a result file and one that does not.

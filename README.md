@@ -298,7 +298,10 @@ repair:
   mode: autopilot
   agent:
     provider: generic-cli
-    command: [codex, exec, "{prompt_file}"]   # or [claude, -p, "{prompt_file}"]
+    command:
+      - sh
+      - -c
+      - 'codex exec --approve-for-me -C {workspace} "$(cat {prompt_file})"'
   permissions:
     documentation: true
     source_code: true
@@ -308,6 +311,18 @@ repair:
     scientific_claims: false # removing or altering a claim
     methodology: false       # changing how something is evaluated
 ```
+
+Two details decide whether a repair command works at all, and both fail
+quietly if you get them wrong. The prompt is passed as **text**, not as a
+path: `codex exec {prompt_file}` hands the agent a filename as its
+instruction. And the agent must be allowed to write files without waiting
+for an approval nobody is there to give — `--approve-for-me` for Codex,
+`--permission-mode acceptEdits` for Claude Code. An agent that runs, exits
+zero and changes nothing is reported as a failure and stops the loop,
+naming the command and its exit code, rather than being recorded as a
+partial success.
+
+
 
 The agent is a worker, configured by a command template. Swapping Codex for
 another tool is one line of YAML; nothing else in Veritas changes.

@@ -6,15 +6,26 @@ The command is a template, so the same adapter drives whichever tool you have:
 repair:
   agent:
     provider: generic-cli
-    command: [codex, exec, "{prompt_file}"]
+    command:
+      - sh
+      - -c
+      - 'codex exec --approve-for-me -C {workspace} "$(cat {prompt_file})"'
 ```
 
 ```yaml
 repair:
   agent:
     provider: generic-cli
-    command: [claude, -p, "{prompt_file}"]
+    command:
+      - sh
+      - -c
+      - 'claude -p "$(cat {prompt_file})" --permission-mode acceptEdits'
 ```
+
+Two things a command must get right, because both fail silently otherwise: the
+prompt is passed as *text*, not as a path, and the agent must be allowed to
+write files without waiting for an approval nobody is there to give. An agent
+that runs and changes nothing is reported as a failure, not as a partial.
 
 Nothing about a specific vendor is encoded here, so swapping the tool is a
 configuration change and the rest of Veritas is unaffected. A vendor-specific
@@ -107,6 +118,13 @@ class GenericCLIRepairAgent:
         changed = [path for path in changed if not path.startswith(".veritas/")]
         reported = _read_result(result_file)
 
+        # An agent handed actions that changed no file did not repair anything,
+        # whatever it exited with or claims in its own report. A misconfigured
+        # command — a prompt passed as a path, a sandbox that forbids writing,
+        # an approval nobody will give — exits zero and does nothing, and that
+        # used to be recorded as a quiet `partial` the loop carried straight past.
+        no_op = bool(plan.actions) and not changed
+
         if reported is not None:
             # Trust the agent's report for narrative fields, but the changed-file
             # list comes from the filesystem, not from the agent's claim.
@@ -118,14 +136,17 @@ class GenericCLIRepairAgent:
                 "exit_code": returncode,
                 "output": output,
             }
+            if no_op:
+                reported.status = "failed"
+                reported.notes = [*reported.notes, _no_op_note(command, returncode)]
             return reported
 
-        status = (
-            "completed" if returncode == 0 and changed else "failed" if returncode else "partial"
-        )
-        notes = [f"the agent wrote no result file; status inferred from exit code {returncode}"]
-        if returncode == 0 and not changed:
-            notes.append("the command succeeded but changed nothing")
+        if no_op:
+            status = "failed"
+            notes = [_no_op_note(command, returncode)]
+        else:
+            status = "completed" if returncode == 0 else "failed"
+            notes = [f"the agent wrote no result file; status inferred from exit code {returncode}"]
         return RepairResult(
             action_ids=[action.id for action in plan.actions],
             status=status,  # type: ignore[arg-type]
@@ -244,4 +265,12 @@ def _failed(plan: RepairPlan, message: str) -> RepairResult:
         status="failed",
         notes=[message],
         metadata={"agent": GenericCLIRepairAgent.name},
+    )
+
+
+def _no_op_note(command: list[str], returncode: int) -> str:
+    """Say plainly that nothing happened, and give the operator the cause to check."""
+    return (
+        f"the repair command exited {returncode} and changed no file, so none of the "
+        f"planned actions were carried out. Command: {' '.join(command)}"
     )

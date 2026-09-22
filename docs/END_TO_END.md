@@ -221,7 +221,10 @@ repair:
   mode: autopilot
   agent:
     provider: generic-cli
-    command: [codex, exec, "{prompt_file}"]
+    command:
+      - sh
+      - -c
+      - 'codex exec --approve-for-me -C {workspace} "$(cat {prompt_file})"'
   permissions:
     documentation: true
     source_code: true
@@ -236,8 +239,24 @@ Available placeholders: `{prompt_file}`, `{plan_file}`, `{result_file}`,
 `{workspace}`. Swapping the tool is one line:
 
 ```yaml
-    command: [claude, -p, "{prompt_file}"]
+    command:
+      - sh
+      - -c
+      - 'claude -p "$(cat {prompt_file})" --permission-mode acceptEdits'
 ```
+
+Two details decide whether the command works, and both fail quietly:
+
+- **Pass the prompt as text, not as a path.** `codex exec {prompt_file}`
+  hands the agent a filename as its instruction, and it will politely do
+  nothing. `"$(cat {prompt_file})"` passes the contents.
+- **Let the agent write.** A default sandbox that forbids writing, or an
+  approval prompt with nobody to answer it, produces a clean exit and an
+  untouched workspace.
+
+If a command runs, exits zero and changes no file, Veritas records the repair
+as failed and stops the loop, naming the command and its exit code. An agent
+that repaired nothing is never reported as having repaired something.
 
 ## 13. Dry run first
 
