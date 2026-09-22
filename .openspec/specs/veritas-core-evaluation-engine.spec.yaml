@@ -31,6 +31,7 @@ acceptance_criteria:
 - "Given a malformed or non-conforming LLM response, when a judge parses it, then a structured error result is produced rather than an unhandled exception, and the run continues."
 - "Given judges that could not complete (unreachable provider, missing credentials, malformed responses), when the gate is evaluated, then it never reports PASS: the failed judges are named in the gate result and the run is reported as not fully evaluated."
 - "Given a completed run, when `veritas report`, `veritas findings`, `veritas claims` and `veritas gate` are invoked, then each reads the persisted run and returns the recorded data with the documented exit codes (0 pass, 1 warnings, 2 revise, 3 fail)."
+- "Given a finding listed in gate.accepted_risks with a reason, when the gate is evaluated, then that finding no longer blocks but is still counted in the severity totals and named as an accepted risk; an acceptance that matches no finding or has expired is reported as stale and does not suppress anything."
 - "Given a judge or check that is running, when the console reports progress, then it never falls silent for the duration of that work: a spinner names what is in flight until it completes."
 - "Given a configured path that resolves outside the artifact directory, when files are collected, then they are described relative to the artifact rather than by absolute path, and the run reports that paths reach outside it."
 - "Given a file longer than the configured per-file limit, when an evaluation runs, then the truncation is reported before the judges run, and a manuscript of ordinary length is never truncated by default."
@@ -48,6 +49,8 @@ test_plan:
 - 'Unit test: sampling parameters are omitted from a provider request unless explicitly configured, and are sent when they are.'
 - 'Unit test: the OpenAI output-length parameter adapts to whichever field the endpoint accepts, and each compatibility fallback is attempted at most once.'
 - 'Unit test: a 429 reporting an exhausted quota fails immediately, while an ordinary rate limit is still retried.'
+- 'Unit test: accepted risks stop blocking without changing the reported counts, do not excuse other findings or failing required checks, expire, and are reported as stale when they match nothing.'
+- 'Unit test: the content-derived issue id survives rewording and renumbering of the same finding.'
 - 'Unit test: a gate evaluated with judge errors fails, names the failed judges, and the behaviour can be disabled explicitly.'
 - 'Integration test: an evaluation against an unreachable provider exits 3 with FAIL rather than 0 with PASS.'
 - 'Unit test: profile discovery resolves the shipped profiles for an artifact whose config lives in a subdirectory, under both an editable and a built install.'

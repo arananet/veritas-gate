@@ -61,6 +61,12 @@ Guidelines:
   `gpt-5.6-terra`, `gemini-3.1-pro`. The OpenSpec template's own spec-review and
   issue-autofix agents were moved off their stale ids too. The example-paper test no longer names the default
   ids, so bumping a model cannot break it (spec: veritas-core-evaluation-engine).
+- `gate.accepted_risks` carries findings that are correct but deliberately accepted, each
+  with a reason and an optional expiry. An accepted finding stops blocking but is still
+  reported and still counted; acceptances that match nothing or have expired are reported
+  as stale. `veritas findings` gained an `Issue` column with the content-derived id that
+  stays stable across runs, which is what an acceptance names
+  (spec: veritas-core-evaluation-engine).
 - `veritas loop` silenced the evaluation engine's own progress, so an iteration went
   fully quiet between "Iteration N / M" and the result — indistinguishable from a hang
   against a real paper and a slow model. Both `veritas evaluate` and `veritas loop` now

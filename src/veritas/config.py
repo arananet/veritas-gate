@@ -10,11 +10,12 @@ from __future__ import annotations
 
 import os
 import re
+from datetime import date
 from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 CONFIG_FILENAME = "veritas.yaml"
 RUNS_DIRNAME = ".veritas"
@@ -55,6 +56,34 @@ class ModelConfig(BaseModel):
     tls_verify: bool | str = True
 
 
+class AcceptedRisk(BaseModel):
+    """A finding the maintainer has decided to carry, on the record.
+
+    Accepting a risk stops it blocking the gate. It never hides it: the finding
+    is still reported, still counted, and still named alongside the reason it
+    was accepted. An exception nobody can see is indistinguishable from a bug.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    reason: str
+    expires: date | None = None
+
+    @field_validator("reason")
+    @classmethod
+    def _reason_must_say_something(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError(
+                "an accepted risk needs a reason: it is the only record of why "
+                "a known problem was allowed through"
+            )
+        return value
+
+    def active_on(self, today: date) -> bool:
+        return self.expires is None or self.expires >= today
+
+
 class GatePolicy(BaseModel):
     """Deterministic gate thresholds."""
 
@@ -71,6 +100,10 @@ class GatePolicy(BaseModel):
     # A judge that could not run did not approve anything. An evaluation that
     # failed to happen must never be reported as a pass.
     fail_on_judge_error: bool = True
+    # Findings carried deliberately. They are reported and counted as usual;
+    # they simply do not block. Each needs a reason, and may carry an expiry
+    # after which it blocks again.
+    accepted_risks: list[AcceptedRisk] = Field(default_factory=list)
 
 
 class CheckConfig(BaseModel):

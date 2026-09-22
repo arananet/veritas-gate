@@ -6,6 +6,8 @@ the reports and the CLI never need to know which producer a result came from.
 
 from __future__ import annotations
 
+import hashlib
+import re
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -70,3 +72,50 @@ class Finding(BaseModel):
         evidence is retained but carries less weight than one that does.
         """
         return self.model_copy(update={"confidence": max(0.0, min(1.0, self.confidence * factor))})
+
+
+_WORD = re.compile(r"[a-z0-9]+")
+_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "by",
+    "for",
+    "from",
+    "has",
+    "in",
+    "is",
+    "it",
+    "its",
+    "no",
+    "not",
+    "of",
+    "on",
+    "or",
+    "that",
+    "the",
+    "this",
+    "to",
+    "was",
+    "were",
+    "with",
+}
+
+
+def issue_key(finding: Finding) -> str:
+    """A content-derived identity for a finding, stable across runs.
+
+    The per-run ids judges produce (``EVIDENCE-001``) are positional and change
+    between evaluations. This one is derived from the category, the location
+    and the significant words of the title, so the same issue reported with
+    slightly different wording still maps to the same identity. It is what the
+    ledger tracks across iterations, and what a user names to accept a risk.
+    """
+    words = sorted(word for word in _WORD.findall(finding.title.lower()) if word not in _STOPWORDS)
+    material = "|".join([finding.category.lower(), (finding.location or "").strip(), *words])
+    digest = hashlib.sha256(material.encode("utf-8")).hexdigest()[:8]
+    return f"F{digest.upper()}"

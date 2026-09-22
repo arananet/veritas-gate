@@ -8,13 +8,16 @@ instead of a guess based on counting.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 from pathlib import Path
 
 from veritas.models.evaluation import EvaluationResult
-from veritas.models.finding import Finding, severity_rank
+from veritas.models.finding import Finding, issue_key, severity_rank
+
+# issue_key lives with the finding model now; re-exported here because the
+# ledger is where its cross-iteration meaning is defined.
+__all__ = ["FindingLedger", "issue_key"]
 from veritas.models.loop import LedgerEntry, LedgerStatus
 
 _WORD = re.compile(r"[a-z0-9]+")
@@ -48,19 +51,6 @@ _STOPWORDS = {
     "with",
 }
 MATCH_THRESHOLD = 0.5
-
-
-def issue_key(finding: Finding) -> str:
-    """A content-derived identity for a finding, stable across runs.
-
-    Built from the category, the location and the significant words of the
-    title, so the same issue reported with slightly different wording in a
-    later iteration maps to the same ledger entry.
-    """
-    words = sorted(_tokens(finding.title))
-    material = "|".join([finding.category.lower(), (finding.location or "").strip(), *words])
-    digest = hashlib.sha256(material.encode("utf-8")).hexdigest()[:8]
-    return f"F{digest.upper()}"
 
 
 def _tokens(text: str) -> set[str]:

@@ -8,7 +8,7 @@ from rich.table import Table
 from rich.text import Text
 
 from veritas.models.evaluation import EvaluationResult, GateResult
-from veritas.models.finding import Finding, severity_rank
+from veritas.models.finding import Finding, issue_key, severity_rank
 from veritas.reports.spinner import WorkSpinner
 
 SEVERITY_STYLE = {
@@ -127,6 +127,7 @@ class ConsoleReporter:
         self.console.print()
         self._judge_errors(result)
         self._claims(result)
+        self._accepted_risks(result.gate)
         self._findings_table(result.gate)
         self._blocking(result)
         self._gate(result.gate)
@@ -161,6 +162,25 @@ class ConsoleReporter:
             self.console.print(f"  [dim]? {coverage.unverified} unverified[/dim]")
         self.console.print(f"  evidence coverage: {coverage.coverage}%")
         self.console.print()
+
+    def _accepted_risks(self, gate: GateResult) -> None:
+        """Name what was carried deliberately, and what has gone stale."""
+        if gate.accepted_risks:
+            self.console.print(
+                f"[cyan]{len(gate.accepted_risks)} finding(s) accepted as known risk:[/cyan] "
+                + ", ".join(gate.accepted_risks)
+            )
+        if gate.stale_accepted_risks:
+            self.console.print(
+                f"[yellow]{len(gate.stale_accepted_risks)} accepted risk(s) match nothing "
+                "or have expired:[/yellow] " + ", ".join(gate.stale_accepted_risks)
+            )
+            self.console.print(
+                "[dim]Remove them from gate.accepted_risks, or they will outlive "
+                "the problem they excused.[/dim]"
+            )
+        if gate.accepted_risks or gate.stale_accepted_risks:
+            self.console.print()
 
     def _findings_table(self, gate: GateResult) -> None:
         table = Table(show_header=False, box=None, pad_edge=False)
@@ -205,17 +225,24 @@ class ConsoleReporter:
             return
         table = Table(box=None, pad_edge=False)
         table.add_column("ID", style="bold")
+        table.add_column("Issue", style="dim")
         table.add_column("Severity")
         table.add_column("Title")
         table.add_column("Location", style="dim")
         for finding in findings:
             table.add_row(
                 finding.id,
+                issue_key(finding),
                 Text(finding.severity.upper(), style=SEVERITY_STYLE[finding.severity]),
                 finding.title,
                 finding.location or "-",
             )
         self.console.print(table)
+        self.console.print()
+        self.console.print(
+            "[dim]ID changes between runs; Issue is stable — it is what you name in "
+            "gate.accepted_risks.[/dim]"
+        )
 
     def claims_list(self, result: EvaluationResult) -> None:
         coverage = result.coverage
