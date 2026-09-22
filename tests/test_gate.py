@@ -124,3 +124,116 @@ def test_judge_errors_can_be_tolerated_explicitly() -> None:
 
 def test_no_judge_errors_leaves_the_verdict_untouched() -> None:
     assert evaluate_gate([], [], GatePolicy(), judge_errors=[]).status == "PASS"
+
+
+# --------------------------------------------------------- accepted risks
+
+
+def evidenced(fid: str, severity: str, title: str, location: str = "paper/main.md") -> Finding:
+    return Finding(
+        id=fid,
+        title=title,
+        severity=severity,  # type: ignore[arg-type]
+        category="reproducibility",
+        description="d",
+        location=location,
+        evidence=["e"],
+    )
+
+
+def test_an_accepted_risk_stops_blocking_but_is_still_counted() -> None:
+    """Accepting is not hiding: the severity totals must not change."""
+    from veritas.models.finding import issue_key
+
+    item = evidenced("REPRO-001", "major", "Manuscript is git-ignored")
+    policy = GatePolicy(
+        max_major=0,
+        accepted_risks=[{"id": issue_key(item), "reason": "Pre-publication, by choice."}],
+    )
+    result = evaluate_gate([item], [], policy)
+
+    assert result.status == "PASS"
+    assert result.major == 1, "the finding is still counted"
+    assert result.blocking_findings == []
+    assert result.accepted_risks == [issue_key(item)]
+    assert any("accepted as known risk" in reason for reason in result.reasons)
+
+
+def test_accepting_one_risk_does_not_excuse_another() -> None:
+    from veritas.models.finding import issue_key
+
+    accepted = evidenced("A-1", "major", "Manuscript is git-ignored")
+    other = evidenced("A-2", "major", "Headline number contradicts the benchmark", "results.json")
+    policy = GatePolicy(
+        max_major=0,
+        accepted_risks=[{"id": issue_key(accepted), "reason": "Pre-publication."}],
+    )
+    result = evaluate_gate([accepted, other], [], policy)
+
+    assert result.status == "REVISE"
+    assert result.blocking_findings == ["A-2"]
+    assert result.major == 2
+
+
+def test_an_expired_acceptance_blocks_again() -> None:
+    from datetime import date
+
+    from veritas.models.finding import issue_key
+
+    item = evidenced("A-1", "major", "Manuscript is git-ignored")
+    policy = GatePolicy(
+        max_major=0,
+        accepted_risks=[
+            {"id": issue_key(item), "reason": "Until publication.", "expires": "2026-01-01"}
+        ],
+    )
+    result = evaluate_gate([item], [], policy, today=date(2026, 9, 22))
+
+    assert result.status == "REVISE"
+    assert result.accepted_risks == []
+    assert result.stale_accepted_risks == [issue_key(item)]
+
+
+def test_an_acceptance_matching_nothing_is_reported_as_stale() -> None:
+    """A stale exception is how a gate quietly stops meaning anything."""
+    policy = GatePolicy(accepted_risks=[{"id": "FDEADBEEF", "reason": "Fixed long ago."}])
+    result = evaluate_gate([], [], policy)
+
+    assert result.status == "PASS"
+    assert result.stale_accepted_risks == ["FDEADBEEF"]
+    assert any("no longer match" in reason for reason in result.reasons)
+
+
+def test_a_critical_finding_can_be_accepted_but_stays_visible() -> None:
+    from veritas.models.finding import issue_key
+
+    item = evidenced("C-1", "critical", "Result cannot be reproduced")
+    policy = GatePolicy(
+        accepted_risks=[{"id": issue_key(item), "reason": "Known, tracked in issue #12."}]
+    )
+    result = evaluate_gate([item], [], policy)
+
+    assert result.status == "PASS"
+    assert result.critical == 1, "a critical finding is never erased by accepting it"
+    assert result.accepted_risks == [issue_key(item)]
+
+
+def test_accepting_a_finding_does_not_excuse_a_failing_required_check() -> None:
+    from veritas.models.finding import issue_key
+
+    item = evidenced("A-1", "major", "Manuscript is git-ignored")
+    check = CheckResult(check="tests", status="fail")
+    policy = GatePolicy(
+        require_checks=["tests"],
+        accepted_risks=[{"id": issue_key(item), "reason": "Pre-publication."}],
+    )
+    assert evaluate_gate([item], [check], policy).status == "FAIL"
+
+
+def test_the_stable_id_survives_rewording_and_renumbering() -> None:
+    """The id a user writes in veritas.yaml must outlive the run that produced it."""
+    from veritas.models.finding import issue_key
+
+    first = evidenced("EVIDENCE-001", "major", "Manuscript is git-ignored")
+    later = evidenced("REPRO-007", "critical", "git-ignored is the Manuscript")
+    assert issue_key(first) == issue_key(later)

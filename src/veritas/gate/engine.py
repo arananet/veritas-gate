@@ -7,10 +7,12 @@ same process exit code.
 
 from __future__ import annotations
 
+from datetime import UTC, date, datetime
+
 from veritas.config import GatePolicy
 from veritas.gate.policy import severity_counts
 from veritas.models.evaluation import CheckResult, ClaimCoverage, GateResult
-from veritas.models.finding import Finding, severity_rank
+from veritas.models.finding import Finding, issue_key, severity_rank
 
 
 def evaluate_gate(
@@ -19,10 +21,19 @@ def evaluate_gate(
     policy: GatePolicy,
     coverage: ClaimCoverage | None = None,
     judge_errors: list[str] | None = None,
+    today: date | None = None,
 ) -> GateResult:
     """Apply ``policy`` to the consolidated findings and check results."""
-    counts = severity_counts(findings)
     judge_errors = list(judge_errors or [])
+
+    # Two counts, deliberately. `counts` is what the run reports and what the
+    # user sees: it includes accepted risks, because accepting a finding must
+    # never make it disappear. `findings` below is what the policy is applied
+    # to, with accepted risks removed, because that is what accepting means.
+    counts = severity_counts(findings)
+    accepted_ids, accepted, stale = _partition_accepted(findings, policy, today)
+    findings = [item for item in findings if item.id not in accepted_ids]
+    blocking_counts = severity_counts(findings)
     blocking: list[str] = []
     reasons: list[str] = []
     fail = False
@@ -44,10 +55,12 @@ def evaluate_gate(
     ):
         if limit is None or severity in policy.fail_on:
             continue
-        if counts[severity] > limit:
+        if blocking_counts[severity] > limit:
             offenders = [item.id for item in findings if item.severity == severity]
             blocking.extend(offenders)
-            reasons.append(f"{counts[severity]} {severity} finding(s) exceed the limit of {limit}.")
+            reasons.append(
+                f"{blocking_counts[severity]} {severity} finding(s) exceed the limit of {limit}."
+            )
             if severity_rank(severity) >= severity_rank("major"):
                 revise = True
 
@@ -96,13 +109,24 @@ def evaluate_gate(
             f"({', '.join(judge_errors)}); the artifact was not fully evaluated."
         )
 
+    if accepted:
+        reasons.append(
+            f"{len(accepted)} finding(s) accepted as known risk and not blocking: "
+            + ", ".join(accepted)
+        )
+    if stale:
+        reasons.append(
+            f"{len(stale)} accepted risk(s) no longer match any finding or have expired: "
+            + ", ".join(stale)
+        )
+
     if fail:
         status = "FAIL"
     elif revise:
         status = "REVISE"
-    elif counts["minor"] and policy.warn_on_minor:
+    elif blocking_counts["minor"] and policy.warn_on_minor:
         status = "PASS_WITH_WARNINGS"
-        reasons.append(f"{counts['minor']} minor finding(s) present.")
+        reasons.append(f"{blocking_counts['minor']} minor finding(s) present.")
     else:
         status = "PASS"
         reasons.append("No blocking findings under the configured policy.")
@@ -116,5 +140,38 @@ def evaluate_gate(
         blocking_findings=sorted(dict.fromkeys(blocking)),
         failed_checks=failed_checks,
         judge_errors=judge_errors,
+        accepted_risks=accepted,
+        stale_accepted_risks=stale,
         reasons=reasons,
     )
+
+
+def _partition_accepted(
+    findings: list[Finding],
+    policy: GatePolicy,
+    today: date | None,
+) -> tuple[set[str], list[str], list[str]]:
+    """Split the accepted risks into those in force and those gone stale.
+
+    Returns the per-run ids to exclude from blocking, the stable ids actually
+    accepted, and the stable ids configured but no longer matching any finding
+    (or expired). A stale exception is reported rather than removed, because an
+    exception nobody revisits is how a gate quietly stops meaning anything.
+    """
+    if not policy.accepted_risks:
+        return set(), [], []
+
+    now = today or datetime.now(UTC).date()
+    present = {issue_key(finding): finding for finding in findings}
+
+    excluded: set[str] = set()
+    accepted: list[str] = []
+    stale: list[str] = []
+    for risk in policy.accepted_risks:
+        finding = present.get(risk.id)
+        if finding is None or not risk.active_on(now):
+            stale.append(risk.id)
+            continue
+        excluded.add(finding.id)
+        accepted.append(risk.id)
+    return excluded, sorted(accepted), sorted(stale)

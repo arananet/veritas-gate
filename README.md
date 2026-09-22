@@ -227,6 +227,30 @@ Progress is measured by **blocking findings and issue resolution**, never by an
 aggregate score. A quality number rising from 81 to 83 while a new critical
 finding appears is not progress; the loop stops.
 
+### Carrying a known problem on the record
+
+Some findings are correct and you still need to ship. A manuscript kept out of
+version control before publication is a real reproducibility gap — and also a
+deliberate choice with a date on it.
+
+```yaml
+gate:
+  accepted_risks:
+    - id: F6F3F837D                 # the stable Issue id from `veritas findings`
+      reason: "Pre-publication: paper files stay private until submission."
+      expires: 2026-12-31           # optional; after this it blocks again
+```
+
+Accepting is not hiding. The finding is still reported, still counted in the
+severity totals, and named in the run alongside its reason — it simply stops
+blocking the gate. An acceptance that no longer matches any finding, or that
+has expired, is reported as stale, because an exception nobody revisits is how
+a gate quietly stops meaning anything.
+
+The `Issue` column in `veritas findings` is the id to use: it is derived from
+the finding's content, so it survives rewording and renumbering between runs,
+unlike the per-run `EVIDENCE-001` style ids.
+
 ### The safety invariant
 
 > Veritas may autonomously improve how existing evidence is **represented,
