@@ -215,6 +215,12 @@ class LoopOrchestrator:
                     "requires a human decision before it can be repaired",
                 )
                 result.human_decisions = [action.id for action in human]
+
+            # A human decision stops the loop either way; what the mode decides
+            # is whether the mechanical work happens first. Deferring never
+            # widens what an agent may touch: an action marked as needing a
+            # human is not in `plan.autonomous_actions` and is never dispatched.
+            if human and (self.config.on_human_decision == "stop" or not plan.autonomous_actions):
                 stop = StopReason.HUMAN_DECISION_REQUIRED
                 detail = _human_detail(human)
                 result.iterations.append(_finish(record, self.options.now()))
@@ -298,6 +304,13 @@ class LoopOrchestrator:
                 result.iterations.append(_finish(record, self.options.now()))
                 break
 
+            if human:
+                # The mechanical work is done; now ask, against a cleaner artifact.
+                stop = StopReason.HUMAN_DECISION_REQUIRED
+                detail = _human_detail(human, repaired=len(plan.autonomous_actions))
+                result.iterations.append(_finish(record, self.options.now()))
+                break
+
             self.phase = Phase.MEASURE
             previous = evaluation
             result.iterations.append(_finish(record, self.options.now()))
@@ -361,8 +374,13 @@ def _empty_gate() -> GateResult:
     return GateResult(status="FAIL")
 
 
-def _human_detail(actions: list[RepairAction]) -> str:
+def _human_detail(actions: list[RepairAction], repaired: int = 0) -> str:
     lines = []
+    if repaired:
+        lines.append(
+            f"{repaired} autonomous action(s) were repaired first; "
+            f"{len(actions)} decision(s) remain for a human:"
+        )
     for action in actions:
         findings = ", ".join(action.finding_ids)
         reason = action.blocked_reason or "requires a human decision"
