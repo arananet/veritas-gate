@@ -34,9 +34,10 @@ from veritas.models.finding import Finding
 _MARKDOWN_LINK = re.compile(r"\[[^\]]*\]\(\s*<?([^)\s>]+)>?\s*\)")
 _INLINE_CODE = re.compile(r"`([^`\n]+)`")
 
-# A path-shaped thing in inline code: it has a separator or a known suffix, so
-# `git status` and `outcomeOf` are not mistaken for files.
-_PATH_LIKE = re.compile(r"^[\w.][\w./@+-]*(/[\w./@+-]+|\.[A-Za-z0-9]{1,6})$")
+# A path-shaped thing in inline code must contain a separator. A suffix alone
+# is not enough: `0.21.0`, `Tracer.record` and `textcomp.sty` all end in one and
+# none is a file in the repository. Prose is full of dotted tokens.
+_PATH_LIKE = re.compile(r"^[\w.][\w./@+-]*/[\w./@+-]*$")
 
 _EXTERNAL = ("http://", "https://", "mailto:", "ftp://", "//")
 
@@ -70,28 +71,34 @@ class ReferenceIntegrityCheck:
 
         supplied = _supplied_paths(artifact)
         findings: list[Finding] = []
+        # Every citation to a path that exists but was not supplied has the same
+        # fix -- one line in artifact.paths -- so they are grouped by that line.
+        # Reported one per citation, thirty findings described four edits.
+        unsupplied: dict[str, list[str]] = {}
         checked = 0
 
         for path, text in documents:
-            for line_no, target in _citations(text):
-                checked += 1
+            for line_no, target, from_code in _citations(text):
+                if from_code and not _is_repository_path(artifact.root, path, target):
+                    continue  # a slashed token in prose, not a local path
                 resolved = _resolve(artifact.root, path, target)
                 if resolved is None:
                     continue  # outside the repository; not this check's business
+                checked += 1
                 if not resolved.exists():
                     findings.append(self._dangling(len(findings) + 1, path, line_no, target))
                 elif not _is_supplied(artifact.root, resolved, supplied):
-                    findings.append(
-                        self._unsupplied(
-                            len(findings) + 1, path, line_no, target, resolved, artifact.root
-                        )
-                    )
+                    rel = _relative(artifact.root, resolved)
+                    unsupplied.setdefault(rel, []).append(f"{path}:{line_no} -> {target}")
+
+        for rel, citations in sorted(unsupplied.items()):
+            findings.append(self._unsupplied(len(findings) + 1, rel, citations))
 
         status: Literal["pass", "fail"] = "pass" if not findings else "fail"
         summary = (
             f"{checked} reference(s) checked, all resolve"
             if not findings
-            else f"{len(findings)} of {checked} reference(s) do not resolve"
+            else f"{len(findings)} problem(s) across {checked} reference(s)"
         )
         return CheckResult(
             check=self.name,
@@ -128,40 +135,57 @@ class ReferenceIntegrityCheck:
             ),
         )
 
-    def _unsupplied(
-        self, index: int, document: str, line: int, target: str, resolved: Path, root: Path
-    ) -> Finding:
-        rel = _relative(root, resolved)
+    def _unsupplied(self, index: int, rel: str, citations: list[str]) -> Finding:
+        count = len(citations)
+        where = "1 citation" if count == 1 else f"{count} citations"
         return check_finding(
             self.name,
             index,
-            title=f"Cited path exists but was not supplied to Veritas: {target}",
+            title=f"Cited path exists but was not supplied to Veritas: {rel}",
             severity=self.config.severity_on_failure,
             description=(
-                f"{document} line {line} cites `{target}`, which exists on disk but is "
-                "not within the artifact's configured paths. The document is right and "
-                "the configuration is incomplete: judges cannot see this file, and will "
-                "report it as missing evidence."
+                f"{rel} exists on disk and is cited by {where}, but it is not within "
+                "the artifact's configured paths. The documents are right and the "
+                "configuration is incomplete: judges cannot see this, and will report "
+                "it as missing evidence."
             ),
-            location=f"{document}:{line}",
-            evidence=[f"{document}:{line} -> {target}", f"exists at {rel}"],
+            location=citations[0].split(" -> ")[0],
+            evidence=citations[:10],
             recommendation=f"Add `{rel}` to artifact.paths in veritas.yaml.",
         )
 
 
-def _citations(text: str) -> list[tuple[int, str]]:
-    """Every relative path the text cites, with the line it appears on."""
-    found: list[tuple[int, str]] = []
+def _citations(text: str) -> list[tuple[int, str, bool]]:
+    """Every relative path the text cites: line, target, and whether it is inline code.
+
+    A Markdown link to a relative path is unambiguous. A slashed token in
+    inline code is not, so the caller checks it harder.
+    """
+    found: list[tuple[int, str, bool]] = []
     for line_no, line in enumerate(text.splitlines(), start=1):
         for match in _MARKDOWN_LINK.finditer(line):
             target = match.group(1).strip()
             if _is_local(target):
-                found.append((line_no, target))
+                found.append((line_no, target, False))
         for match in _INLINE_CODE.finditer(line):
             target = match.group(1).strip()
             if _is_local(target) and _PATH_LIKE.match(target):
-                found.append((line_no, target))
+                found.append((line_no, target, True))
     return found
+
+
+def _is_repository_path(root: Path, document: str, target: str) -> bool:
+    """Does this token's first segment name something the repository has?
+
+    Inline code carries plenty of slashed things that are not local paths --
+    `google/A2UI` is an upstream owner and repository. Requiring the first
+    segment to exist keeps the check on paths without a vendor list.
+    """
+    clean = target.split("#", 1)[0].lstrip("./").strip("/")
+    head = clean.split("/", 1)[0]
+    if not head:
+        return False
+    return (root / head).exists() or ((root / document).parent / head).exists()
 
 
 def _is_local(target: str) -> bool:

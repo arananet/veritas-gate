@@ -35,6 +35,10 @@ acceptance_criteria:
 - "Given the captured output, when the result is recorded, then it is still bounded to the existing limit so a chatty agent cannot fill the run directory."
 - "Given a repair whose status is not completed, when it is reported, then the agent's own notes are printed under that status, because an agent that declines actions explains itself and that account was written to disk and never shown."
 - "Given a repair that completed, when it is reported, then no notes block is printed."
+- "Given a repair that changed files, when the loop finishes, then it prints the changed files and the commands to review the whole repair, review one file, apply all of it, and apply only the files the operator accepts."
+- "Given a repair that changed one file, when the commands are printed, then no partial-apply command is offered."
+- "Given a repair that changed nothing, when the loop finishes, then no apply command is printed."
+- "Given a long workspace path and a narrow terminal, when a command is printed, then it is not wrapped, because a path broken across lines cannot be pasted."
 test_plan:
 - 'Unit test: an agent writing several lines delivers them to the callback in order, before the process exits.'
 - 'Unit test: the captured output in the result matches what was streamed.'
@@ -44,6 +48,9 @@ test_plan:
 - 'Unit test: a non-UTF-8 byte in the output does not raise.'
 - 'Integration test: a loop run prints the agent lines it received.'
 - 'Unit test: an incomplete repair prints the agent notes; a completed one does not.'
+- 'Unit test: the summary prints review and apply commands, including the partial-apply form.'
+- 'Unit test: one changed file offers no partial apply; no changed files offers no apply at all.'
+- 'Unit test: a long workspace path is printed unwrapped in a narrow terminal.'
 qa_notes: |
   The transcript can contain whatever the agent chose to print, including file
   contents from the workspace. It is shown in a terminal the operator already
@@ -54,6 +61,7 @@ out_of_scope:
 - Parsing a specific agent's output format or JSON event stream.
 - Attributing output lines to individual repair actions; agents do not report that.
 - Streaming the agent's output into the persisted run report, which keeps the captured tail as now.
+- Applying a repair on the operator's behalf, under any condition; the repairer proposes and the operator accepts.
 implementation_skill:
 eval_plan:
   scenarios:
@@ -66,3 +74,9 @@ technical_notes: |
 
   A declined action is not a failure: the notes explaining it are the
   operator's only account of what the agent would not do and why.
+
+  Veritas never writes to the operator's tree, so the commands to read and
+  take a repair are part of the result, not an exercise left to the reader.
+  Accepting only some of a repair is the common case: of three changes in
+  the run this came from, two were right and one documented a broken state
+  instead of fixing it.

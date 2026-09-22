@@ -187,3 +187,79 @@ async def test_a_path_missing_under_both_spellings_is_still_reported(tmp_path: P
     result = await check().run(artifact)
     assert result.status == "fail"
     assert "gone" in result.findings[0].title
+
+
+# ------------------------------------------- prose is not a path
+#
+# Every case below was a false positive against a real manuscript. A check
+# that cries wolf is worse than no check: it sends a repair agent chasing
+# ghosts and buries the findings that matter.
+
+
+@pytest.mark.parametrize(
+    "token",
+    [
+        "0.21.0",  # a package version in a table
+        "2.0.0",
+        "^19.2.3",
+        "Tracer.record",  # a dotted identifier
+        "outcomeOf",
+        "size10.clo",  # LaTeX package names, not repository files
+        "textcomp.sty",
+        "calc.sty",
+    ],
+)
+async def test_a_dotted_token_in_prose_is_not_a_path(tmp_path: Path, token: str) -> None:
+    artifact = make(tmp_path, f"The value is `{token}` in this configuration.\n")
+    result = await check().run(artifact)
+    assert result.status == "pass", [f.title for f in result.findings]
+
+
+async def test_an_upstream_owner_and_repository_is_not_a_local_path(tmp_path: Path) -> None:
+    """`google/A2UI` is an upstream project, not a directory here."""
+    artifact = make(tmp_path, "The inspected `google/A2UI` URL redirects to the project.\n")
+    result = await check().run(artifact)
+    assert result.status == "pass", [f.title for f in result.findings]
+
+
+async def test_a_real_repository_path_in_inline_code_is_still_checked(tmp_path: Path) -> None:
+    (tmp_path / "paper" / "evidence").mkdir(parents=True, exist_ok=True)
+    artifact = make(tmp_path, "The run is in `paper/evidence/gone`.\n")
+    result = await check().run(artifact)
+    assert result.status == "fail"
+    assert "gone" in result.findings[0].title
+
+
+# ------------------------------------------- one fix, one finding
+
+
+async def test_citations_to_one_unsupplied_path_are_grouped(tmp_path: Path) -> None:
+    """Thirty findings once described four edits to artifact.paths."""
+    (tmp_path / "paper" / "evidence").mkdir(parents=True)
+    (tmp_path / "paper" / "evidence" / "run.json").write_text("{}", encoding="utf-8")
+    artifact = make(
+        tmp_path,
+        "See [it](./evidence/run.json).\n"
+        "Again [here](./evidence/run.json).\n"
+        "And [once more](./evidence/run.json).\n",
+        paths=["paper/manuscript.md"],
+    )
+    result = await check().run(artifact)
+
+    assert len(result.findings) == 1
+    finding = result.findings[0]
+    assert "3 citations" in finding.description
+    assert len(finding.evidence) == 3
+
+
+async def test_separate_unsupplied_paths_stay_separate(tmp_path: Path) -> None:
+    (tmp_path / "paper" / "evidence").mkdir(parents=True)
+    (tmp_path / "paper" / "evidence" / "a.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "paper" / "evidence" / "b.json").write_text("{}", encoding="utf-8")
+    artifact = make(
+        tmp_path,
+        "See [a](./evidence/a.json) and [b](./evidence/b.json).\n",
+        paths=["paper/manuscript.md"],
+    )
+    result = await check().run(artifact)
+    assert len(result.findings) == 2
