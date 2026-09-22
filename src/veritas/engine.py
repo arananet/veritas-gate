@@ -260,7 +260,12 @@ class Engine:
                     self.options.progress(
                         "judge",
                         judge.name,
-                        {"pass": "ok", "warning": "warn"}.get(result.status, "fail"),
+                        # A judge that broke is not a judge that found problems.
+                        # Collapsing both into "fail" once let a degraded panel
+                        # read as a thorough one.
+                        {"pass": "ok", "warning": "warn", "error": "error"}.get(
+                            result.status, "fail"
+                        ),
                     )
                 return result
 

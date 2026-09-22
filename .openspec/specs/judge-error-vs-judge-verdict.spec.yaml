@@ -1,0 +1,57 @@
+---
+title: A judge that broke must not look like a judge that found problems
+slug: judge-error-vs-judge-verdict
+type: bugfix
+status: review
+author: Claude
+created_at: '2026-09-22'
+updated_at: '2026-09-22'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  Progress reporting collapses every non-passing judge into one red ✗. A judge
+  that ran, read the artifact and reported blocking problems — doing exactly its
+  job — is drawn identically to a judge whose credentials failed, whose provider
+  returned a 429, or whose response could not be parsed.
+
+  The evaluation summary already separates the two, naming every judge that could
+  not complete. The loop's reporter has no such block, so in an autopilot run a
+  broken judge is indistinguishable from a strict one, and the operator reads a
+  degraded panel as a thorough one. This is the same failure that once let the
+  gate pass with seven judges down, resurfacing in the other output.
+
+  An errored judge now has its own mark and its own colour wherever progress is
+  streamed, and the loop reports per iteration which judges could not complete
+  and why.
+acceptance_criteria:
+- "Given a judge that completes and reports blocking findings, when progress is streamed, then it is marked as a verdict, distinct from an error."
+- "Given a judge that could not complete, when progress is streamed, then it carries a distinct mark and colour identifying it as an error rather than a verdict."
+- "Given an iteration in which a judge could not complete, when the loop reports that iteration, then it names that judge and its reason."
+- "Given an iteration in which every judge completed, when the loop reports it, then no error block is printed."
+- "Given a judge that returns a warning, when progress is streamed, then its existing mark is unchanged."
+- "Given the evaluation summary, when judges failed, then it continues to name them as before."
+test_plan:
+- 'Unit test: the engine emits a distinct progress status for an errored judge and for a judge reporting findings.'
+- 'Unit test: the console marks an errored judge differently from a failing one.'
+- 'Unit test: the loop reporter prints the judges that could not complete, with their summaries.'
+- 'Unit test: the loop reporter prints no error block when every judge completed.'
+- 'Unit test: a warning judge keeps its existing mark.'
+qa_notes: |
+  Only presentation changes. The gate already treats a judge error as a failure
+  through fail_on_judge_error; this makes that condition visible while the run
+  is happening rather than only in the summary.
+out_of_scope:
+- Retrying a judge that errored.
+- Changing how the gate treats judge errors.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - A run whose adversarial judge fails on credentials shows an error mark, not a verdict mark.
+  metrics: []
+technical_notes: |
+  The engine's progress call currently maps every status other than pass and
+  warning to "fail"; "error" becomes its own status, and both reporters gain a
+  mark for it.

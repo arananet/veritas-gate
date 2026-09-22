@@ -205,6 +205,15 @@ Three operating modes:
 
 Add `--dry-run` to see the plan autopilot *would* apply, and stop there.
 
+While a repair runs, the agent's most recent line is shown beside the
+spinner, so a long repair can be told apart from a hang. `--verbose`
+prints its whole transcript. Veritas neither parses nor interprets that
+output: it is whatever the configured tool chose to print.
+
+Repairs land in a workspace, never in your tree. When the loop stops it
+prints the commands to review the diff and to apply it — Veritas will not
+apply one for you, because accepting a repair is the operator's decision.
+
 ### The loop always stops
 
 ```yaml
@@ -501,18 +510,24 @@ pricing:                            # optional; without it you get tokens only
     gpt-5: {input_per_million: 1.25, output_per_million: 10.0}
 ```
 
-Four check types, three of which run nothing:
+Five check types, four of which run nothing:
 
 | Type | What it asserts | Runs a subprocess |
 | --- | --- | --- |
 | `required-paths` | Configured paths exist in the artifact | no |
 | `required-sections` | A target document contains configured sections | no |
 | `content-patterns` | A target's text matches, or avoids, regular expressions | no |
+| `reference-integrity` | Every relative path a document cites resolves | no |
 | `command` | An allow-listed command exits zero | yes |
 
 `content-patterns` is how a profile asserts what a regular expression can
 settle — that a manuscript names a DOI, or cites a commit rather than a branch
-that will move. See [`docs/PROFILES.md`](docs/PROFILES.md).
+that will move. `reference-integrity` resolves every relative path a document
+cites, and separates a citation to something that does not exist from one to
+something that exists but was never supplied in `artifact.paths` — the first
+means the document is wrong, the second that the configuration is. See
+[`docs/PROFILES.md`](docs/PROFILES.md) and
+[`docs/EVALUABLE_ARTIFACTS.md`](docs/EVALUABLE_ARTIFACTS.md).
 
 Model ids are never hard-coded. Copy `.env.example`, choose your models, and
 point each judge role at whichever provider you want. The adversarial reviewer
@@ -538,6 +553,7 @@ spots do not decide the outcome.
 | `veritas loop` | Autopilot: the bounded evaluate, repair, re-evaluate loop |
 | `veritas loop --dry-run` | Show what autopilot would do, and stop |
 | `veritas loop --resume` | Continue from the previous loop's ledger |
+| `veritas loop --verbose` | Print the repair agent's full output as it runs |
 | `veritas loop-report` | Show the report from the latest loop |
 | `veritas diff <a> <b>` | Compare two evaluations issue by issue |
 | `veritas profiles` | List every discoverable profile |
@@ -700,6 +716,7 @@ and [`CONTRIBUTING.md`](CONTRIBUTING.md) for the contributor checklist.
 | End-to-end walkthrough | [`docs/END_TO_END.md`](docs/END_TO_END.md) |
 | The repair loop | [`docs/LOOP.md`](docs/LOOP.md) |
 | Writing a profile | [`docs/PROFILES.md`](docs/PROFILES.md) |
+| Making an artifact evaluable | [`docs/EVALUABLE_ARTIFACTS.md`](docs/EVALUABLE_ARTIFACTS.md) |
 | Spec-driven workflow | [`docs/OPENSPEC.md`](docs/OPENSPEC.md) |
 | Small-project adoption | [`docs/ADOPTION.md`](docs/ADOPTION.md) |
 | Branch protection setup | [`docs/BRANCH_PROTECTION.md`](docs/BRANCH_PROTECTION.md) |

@@ -38,6 +38,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+from collections.abc import Callable
 from importlib import resources
 from pathlib import Path
 from typing import Any
@@ -63,10 +64,14 @@ class GenericCLIRepairAgent:
         permissions: RepairPermissions | None = None,
         *,
         prompt: str | None = None,
+        on_output: Callable[[str], None] | None = None,
     ) -> None:
         self.config = config
         self.permissions = permissions or RepairPermissions()
         self.prompt_template = prompt if prompt is not None else load_repair_prompt()
+        # Called with each line the agent writes, as it writes it. Whatever the
+        # configured tool prints; Veritas neither parses nor interprets it.
+        self.on_output = on_output
 
     async def repair(
         self,
@@ -97,6 +102,7 @@ class GenericCLIRepairAgent:
         ]
         before = workspace.snapshot()
 
+        lines: list[str] = []
         try:
             process = await asyncio.create_subprocess_exec(
                 *command,
@@ -105,14 +111,24 @@ class GenericCLIRepairAgent:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
             )
-            stdout, _ = await asyncio.wait_for(process.communicate(), timeout=self.config.timeout)
-            returncode = process.returncode or 0
-            output = stdout.decode("utf-8", errors="replace")[-OUTPUT_LIMIT:]
-        except TimeoutError:
-            process.kill()
-            return _failed(plan, f"the repair command timed out after {self.config.timeout:.0f}s")
         except (OSError, ValueError) as exc:
             return _failed(plan, f"the repair command could not be started: {exc}")
+
+        try:
+            # Read line by line rather than waiting for the process to exit: a
+            # repair runs for minutes, and a spinner alone cannot be told apart
+            # from a hang. Nothing here parses the output -- it belongs to
+            # whichever CLI agent is configured.
+            await asyncio.wait_for(self._stream(process, lines), timeout=self.config.timeout)
+            returncode = process.returncode or 0
+        except TimeoutError:
+            process.kill()
+            return _failed(
+                plan,
+                f"the repair command timed out after {self.config.timeout:.0f}s",
+                output="\n".join(lines)[-OUTPUT_LIMIT:],
+            )
+        output = "\n".join(lines)[-OUTPUT_LIMIT:]
 
         changed = workspace.changed_since(before)
         changed = [path for path in changed if not path.startswith(".veritas/")]
@@ -162,6 +178,21 @@ class GenericCLIRepairAgent:
                 "output": output,
             },
         )
+
+    async def _stream(self, process: asyncio.subprocess.Process, lines: list[str]) -> None:
+        """Collect the agent's output, handing each line to the observer as it lands."""
+        assert process.stdout is not None
+        while True:
+            raw = await process.stdout.readline()
+            if not raw:
+                break
+            # Lenient decoding: an agent may emit progress bytes that are not
+            # valid UTF-8 mid-line, and that must not end the repair.
+            line = raw.decode("utf-8", errors="replace").rstrip("\r\n")
+            lines.append(line)
+            if self.on_output is not None and line.strip():
+                self.on_output(line)
+        await process.wait()
 
     def render_prompt(self, plan: RepairPlan, plan_file: Path, result_file: Path) -> str:
         """Build the repair prompt.
@@ -259,12 +290,17 @@ def _yesno(value: bool) -> str:
     return "yes" if value else "NO"
 
 
-def _failed(plan: RepairPlan, message: str) -> RepairResult:
+def _failed(plan: RepairPlan, message: str, output: str = "") -> RepairResult:
+    metadata: dict[str, Any] = {"agent": GenericCLIRepairAgent.name}
+    if output:
+        # Keep what the agent managed to say before it was killed; it is
+        # usually the only clue to why.
+        metadata["output"] = output
     return RepairResult(
         action_ids=[action.id for action in plan.actions],
         status="failed",
         notes=[message],
-        metadata={"agent": GenericCLIRepairAgent.name},
+        metadata=metadata,
     )
 
 

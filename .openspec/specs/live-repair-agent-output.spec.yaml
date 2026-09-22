@@ -1,0 +1,68 @@
+---
+title: Show what the repair agent is doing while it does it
+slug: live-repair-agent-output
+type: feature
+status: review
+author: Claude
+created_at: '2026-09-22'
+updated_at: '2026-09-22'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  A repair can run for many minutes behind a spinner and a single line reading
+  "Applying autonomous repairs...". The agent's output is captured and only
+  surfaces afterwards, in the result metadata, so while it matters most there is
+  no way to tell progress from a hang, or useful work from an agent looping on a
+  file it cannot write.
+
+  The agent's stdout is now read line by line and streamed as it arrives. The
+  default view stays compact — the spinner carries the agent's most recent line —
+  and `--verbose` prints the transcript in full for when something has gone wrong.
+
+  Nothing here is specific to any one tool. The adapter drives whatever CLI is
+  configured, so what is shown is the configured agent's own output, whether that
+  is Codex, Claude Code, a Copilot CLI or anything else that writes to stdout.
+acceptance_criteria:
+- "Given a repair agent writing to stdout, when it runs, then its lines reach the reporter as they are produced rather than only when the process exits."
+- "Given the default console, when the agent is running, then the most recent line of its output is visible alongside the spinner."
+- "Given verbose output is requested, when the agent runs, then every line it writes is printed as it arrives."
+- "Given an agent that writes nothing, when it runs, then the spinner behaves as before and no empty output is printed."
+- "Given a repair that exceeds its timeout, when it is killed, then the output captured up to that point is retained in the result."
+- "Given any configured agent command, when its output is streamed, then no parsing specific to a particular vendor's format is applied."
+- "Given the captured output, when the result is recorded, then it is still bounded to the existing limit so a chatty agent cannot fill the run directory."
+- "Given a repair whose status is not completed, when it is reported, then the agent's own notes are printed under that status, because an agent that declines actions explains itself and that account was written to disk and never shown."
+- "Given a repair that completed, when it is reported, then no notes block is printed."
+test_plan:
+- 'Unit test: an agent writing several lines delivers them to the callback in order, before the process exits.'
+- 'Unit test: the captured output in the result matches what was streamed.'
+- 'Unit test: output beyond the limit is truncated in the result while streaming continues.'
+- 'Unit test: an agent that writes nothing produces no callback invocations and a result as before.'
+- 'Unit test: a timed-out agent retains the output seen so far in its failure result.'
+- 'Unit test: a non-UTF-8 byte in the output does not raise.'
+- 'Integration test: a loop run prints the agent lines it received.'
+- 'Unit test: an incomplete repair prints the agent notes; a completed one does not.'
+qa_notes: |
+  The transcript can contain whatever the agent chose to print, including file
+  contents from the workspace. It is shown in a terminal the operator already
+  controls and stored where the run's other artifacts are stored, so this exposes
+  nothing new; it is worth remembering before pasting a verbose transcript into a
+  public issue.
+out_of_scope:
+- Parsing a specific agent's output format or JSON event stream.
+- Attributing output lines to individual repair actions; agents do not report that.
+- Streaming the agent's output into the persisted run report, which keeps the captured tail as now.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - A repair that takes four minutes shows the agent's most recent line throughout.
+  metrics: []
+technical_notes: |
+  Reading stdout line by line replaces `communicate()`, so the timeout wraps the
+  reader rather than the whole call. Decoding stays lenient, since an agent may
+  emit progress characters that are not valid UTF-8 mid-line.
+
+  A declined action is not a failure: the notes explaining it are the
+  operator's only account of what the agent would not do and why.

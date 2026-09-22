@@ -79,6 +79,17 @@ checks:
       - results
       - conclusion
 
+  reference-integrity:
+    type: reference-integrity
+    enabled: true
+    severity_on_failure: major
+    # Every relative path these documents cite must resolve. A regenerated
+    # evidence directory whose name changes leaves the citation pointing at
+    # nothing, and that is a path lookup, not a judgement.
+    required_paths:
+      - paper/manuscript.md
+      - paper/REPRODUCTION.md
+
   # Off by default: these are conventions, not universal requirements, and a
   # profile should not fail a paper for a convention its venue does not hold.
   # Enable in your veritas.yaml and set `target` to your manuscript.
