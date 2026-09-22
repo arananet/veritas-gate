@@ -132,7 +132,50 @@ def parse_structured[T: BaseModel](text: str, schema: type[T]) -> T:
             return schema.model_validate(payload)
         except ValidationError as exc:
             last_error = exc
-            continue
+        # A model sometimes returns a list or object field as a JSON *string* --
+        # the whole array, correctly formed, inside quotes. The content is
+        # intact, and discarding it wastes the call and a judge's coverage.
+        relaxed = _decode_stringified_fields(payload, schema)
+        if relaxed is not payload:
+            try:
+                return schema.model_validate(relaxed)
+            except ValidationError as exc:
+                last_error = exc
+        continue
     raise ProviderError(
         f"could not parse a {schema.__name__} from the model response: {last_error}"
     )
+
+
+def _expects_structure(annotation: Any) -> bool:
+    """Does this field want a list or an object rather than a string?"""
+    text = str(annotation)
+    if "str" in text and "list" not in text and "dict" not in text:
+        return False
+    return "list" in text or "dict" in text or "List" in text or "Dict" in text
+
+
+def _decode_stringified_fields(payload: dict[str, Any], schema: type[BaseModel]) -> dict[str, Any]:
+    """Decode top-level fields sent as JSON strings where the schema wants structure.
+
+    The schema decides, so the parser never guesses what a value was meant to
+    be: a field declared as a string keeps its text, even text that looks like
+    JSON.
+    """
+    fields = schema.model_fields
+    changed = False
+    relaxed = dict(payload)
+    for name, value in payload.items():
+        field = fields.get(name)
+        if field is None or not isinstance(value, str):
+            continue
+        if not _expects_structure(field.annotation):
+            continue
+        try:
+            decoded = json.loads(value)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(decoded, list | dict):
+            relaxed[name] = decoded
+            changed = True
+    return relaxed if changed else payload
