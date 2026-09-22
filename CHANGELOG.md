@@ -128,6 +128,11 @@ Guidelines:
 
 ### Changed
 
+- Relicensed from MIT to Apache License 2.0, with a `NOTICE` file. MIT already required
+  attribution; Apache-2.0 makes it more durable (the NOTICE must be preserved in
+  redistributions), adds an explicit patent grant, and stays compatible with GPL-3.0
+  downstream — so no future licensing path is closed off. Both files ship inside the wheel.
+
 - README starts with one minimal adoption path; agent check and auto-fix instructions follow the shared CLI and readiness contract (spec: lean-agent-workflow).
 - Markdown lint uses CLI 0.23.2 with a patched TOML parser; table spacing follows its new default rule without changing security policies (spec: lean-agent-workflow).
 - CLI, hooks and deterministic CI share a Ruby standard-library YAML engine; Ruby >= 2.6 is now required. `make test name=<slug>` verifies the selected spec.
