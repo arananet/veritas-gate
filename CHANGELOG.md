@@ -61,6 +61,14 @@ Guidelines:
   `gpt-5.6-terra`, `gemini-3.1-pro`. The OpenSpec template's own spec-review and
   issue-autofix agents were moved off their stale ids too. The example-paper test no longer names the default
   ids, so bumping a model cannot break it (spec: veritas-core-evaluation-engine).
+- Per-file truncation was capped at 24,000 characters, which silently cut a 30,000
+  character manuscript: the judges reviewed a paper whose last quarter they never saw.
+  The cap is now 400,000 characters, configurable as `artifact.max_file_chars`, and any
+  truncation is reported before the judges run (spec: veritas-core-evaluation-engine).
+- A git worktree checks out the whole repository, so an artifact in a subdirectory
+  resolved to nothing: the workspace root now points at the artifact's own directory
+  inside the worktree, while changes and patches are still tracked from the repository
+  root (spec: bounded-repair-loop).
 - `veritas files` shows exactly which files the judges would read, their sizes, and a
   rough input-token count per judge — the cost of a run is decided by `artifact.paths`,
   and it was previously only discoverable by paying for an evaluation

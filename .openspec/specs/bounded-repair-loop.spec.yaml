@@ -47,6 +47,7 @@ test_plan:
 - 'Unit test: every stop condition (gate passed, max iterations, no progress, regression, repeated blocker, new critical finding, human decision, cost limit, change limit, repair failure) terminates with its own StopReason.'
 - 'Unit test: permission enforcement refuses experiment, dataset, methodology and claim-removal actions unless explicitly enabled.'
 - 'Unit test: an action requiring evidence that does not exist is never dispatched to an agent, covering the safety invariant.'
+- 'Unit test: a worktree workspace for an artifact in a repository subdirectory resolves that subdirectory, while tracking changes and patches from the repository root.'
 - 'Unit test: Workspace copy mode leaves the original artifact untouched, and git patch capture works when git is present and is skipped when it is not.'
 - 'Unit test: GenericCLIRepairAgent templating writes the plan and prompt files, invokes only an allow-listed command, and builds a RepairResult from the changed files it detects.'
 - 'Integration test: a full multi-iteration loop over an example artifact with MockRepairAgent, asserting the iteration directories, the delta chain and the stop reason.'

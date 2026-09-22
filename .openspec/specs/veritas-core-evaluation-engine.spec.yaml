@@ -31,6 +31,7 @@ acceptance_criteria:
 - "Given a malformed or non-conforming LLM response, when a judge parses it, then a structured error result is produced rather than an unhandled exception, and the run continues."
 - "Given judges that could not complete (unreachable provider, missing credentials, malformed responses), when the gate is evaluated, then it never reports PASS: the failed judges are named in the gate result and the run is reported as not fully evaluated."
 - "Given a completed run, when `veritas report`, `veritas findings`, `veritas claims` and `veritas gate` are invoked, then each reads the persisted run and returns the recorded data with the documented exit codes (0 pass, 1 warnings, 2 revise, 3 fail)."
+- "Given a file longer than the configured per-file limit, when an evaluation runs, then the truncation is reported before the judges run, and a manuscript of ordinary length is never truncated by default."
 - "Given an artifact and a profile, when `veritas files` is invoked, then it lists every file the judges would read with its size and an approximate per-judge token count, without contacting any provider."
 - "Given a project initialised with `veritas init`, when the written config is loaded unmodified, then every provider, model and TLS setting resolves from the environment and no credential appears in the file."
 - "Given `veritas evaluate . --judge evidence --runs 3`, when the same judge is run repeatedly, then per-run results are stored and a stability rating is recorded for that judge."

@@ -209,7 +209,7 @@ def files(
     # Deliberately rough, and rounded down in the wording: this is a sense of
     # scale before spending money, not a billing estimate.
     per_judge_tokens = total_chars // 4
-    limit = 24_000
+    limit = loaded_config.artifact.max_file_chars
 
     if json_output:
         console.print_json(
@@ -316,6 +316,7 @@ def evaluate(
 
     reporter = ConsoleReporter(console, quiet=quiet or json_output)
     reporter.header(loaded_profile.name, str(target))
+    reporter.truncation_warning(artifact.truncated_files(), artifact.max_file_chars)
     options = EngineOptions(
         judge_filter=list(judge or []),
         runs=runs,
@@ -626,12 +627,14 @@ def _artifact_for(target: Path, config: Any, profile: Profile) -> Artifact:
             type=config.artifact.type or profile.definition.artifact_type,
             root=target.parent,
             paths=[target.name],
+            max_file_chars=config.artifact.max_file_chars,
         )
     return Artifact(
         id=target.name or str(target),
         type=config.artifact.type or profile.definition.artifact_type,
         root=target,
         paths=paths,
+        max_file_chars=config.artifact.max_file_chars,
     )
 
 
@@ -643,6 +646,7 @@ def _rebase_artifact(artifact: Artifact, root: Path) -> Artifact:
         root=root,
         paths=list(artifact.paths),
         metadata=dict(artifact.metadata),
+        max_file_chars=artifact.max_file_chars,
     )
 
 

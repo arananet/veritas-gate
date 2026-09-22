@@ -101,7 +101,7 @@ class LLMJudge:
         return "\n\n".join(part for part in parts if part.strip())
 
     def user_prompt(self, artifact: Artifact) -> str:
-        body = wrap_untrusted(artifact.segments())
+        body = wrap_untrusted(artifact.segments(), per_file_limit=artifact.max_file_chars)
         listing = "\n".join(f"- {path}" for path in artifact.file_list()) or "- (none)"
         return (
             f"Artifact id: {artifact.id}\nArtifact type: {artifact.type}\n"
