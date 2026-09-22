@@ -61,6 +61,11 @@ Guidelines:
   `gpt-5.6-terra`, `gemini-3.1-pro`. The OpenSpec template's own spec-review and
   issue-autofix agents were moved off their stale ids too. The example-paper test no longer names the default
   ids, so bumping a model cannot break it (spec: veritas-core-evaluation-engine).
+- README brought back in step with the code: the sample run was missing the `archival`
+  judge and the progress spinner, the configuration example omitted `max_file_chars`,
+  `tls_verify` and `accepted_risks`, the four check types were documented only under
+  `docs/`, and nothing said that reading is text-only so a PDF-only manuscript needs
+  converting first.
 - A `content-patterns` check asserts that a target's text matches, or avoids, configured
   regular expressions — a DOI, a data availability statement, a citation to a mutable
   branch rather than a pinned commit. Deterministic, contacts no provider, and reusable by
