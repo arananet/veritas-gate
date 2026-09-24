@@ -400,6 +400,12 @@ class VeritasConfig(BaseModel):
     repair: RepairConfig = Field(default_factory=RepairConfig)
     workspace: WorkspaceConfig = Field(default_factory=WorkspaceConfig)
     pricing: PricingConfig = Field(default_factory=PricingConfig)
+    # Per-judge scope. Every judge reading the whole artifact cost around
+    # 300,000 input tokens per judge on a real paper. A judge named here reads
+    # only the artifact segments under these paths; one not named reads it all.
+    # Narrowing is deliberate: a judge that cannot see the code cannot report
+    # that the code contradicts the paper.
+    judge_paths: dict[str, list[str]] = Field(default_factory=dict)
     concurrency: int = 4
     root: Path = Field(default_factory=Path.cwd, exclude=True)
 

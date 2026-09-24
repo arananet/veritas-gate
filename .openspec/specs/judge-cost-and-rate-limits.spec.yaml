@@ -1,0 +1,67 @@
+---
+title: Keep an evaluation affordable and within provider rate limits
+slug: judge-cost-and-rate-limits
+type: feature
+status: review
+author: Claude
+created_at: '2026-09-24'
+updated_at: '2026-09-24'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  Every judge read the whole artifact. On a real paper that was around 300,000
+  input tokens per judge and eight judges per evaluation — roughly ten dollars a
+  round — and four judges running at once exceeded a 500,000 tokens-per-minute
+  limit, so half the panel failed with 429s.
+
+  Two changes.
+
+  A rate-limited request now waits as long as the provider says. The response
+  names the wait ("try again in 33.024s", a Retry-After header); the old backoff
+  capped at eight seconds and spent all three attempts before the limit cleared.
+  The provider's wait is honoured, up to a ceiling, so one busy minute no longer
+  costs a judge.
+
+  And each judge can be given only the paths it needs. `judge_paths` in
+  veritas.yaml maps a judge to a subset of the artifact: an archival judge reads
+  the manuscript and the evidence README, not the adapters; a statistics judge
+  reads the manuscript and the tests. A judge without an entry reads the whole
+  artifact as before, and deterministic checks always see all of it.
+acceptance_criteria:
+- "Given a 429 whose body says to try again in a number of seconds, when it is retried, then the next attempt waits at least that long."
+- "Given a 429 with a Retry-After header, when it is retried, then the next attempt waits at least that long."
+- "Given a provider wait longer than the ceiling, when it is retried, then the wait is capped at the ceiling."
+- "Given a retryable failure with no stated wait, when it is retried, then the existing backoff applies."
+- "Given judge_paths naming a judge, when that judge runs, then it receives only artifact segments under those paths."
+- "Given a judge with no judge_paths entry, when it runs, then it receives the whole artifact."
+- "Given judge_paths, when deterministic checks run, then they still see the whole artifact."
+- "Given judge_paths naming a judge the profile does not define, when configuration is used, then the run fails with a message naming it."
+- "Given judge_paths naming a path outside artifact.paths, when that judge runs, then it receives nothing for that path, because judges only ever see the configured artifact."
+test_plan:
+- 'Unit test: the retry delay honours "try again in Ns" and "try again in Nms" in a 429 body.'
+- 'Unit test: the retry delay honours a Retry-After header in seconds.'
+- 'Unit test: the retry delay is capped.'
+- 'Unit test: without a stated wait the existing backoff is used.'
+- 'Unit test: a judge with judge_paths receives only matching segments.'
+- 'Unit test: a judge without an entry receives every segment.'
+- 'Unit test: an unknown judge name in judge_paths is rejected.'
+qa_notes: |
+  Scoping a judge narrows what it can notice. A judge given only the manuscript
+  cannot report that the code contradicts it. The default is unchanged so that
+  narrowing is always a deliberate choice.
+out_of_scope:
+- Summarising or chunking an artifact automatically.
+- Caching judge input between runs.
+- Choosing judge_paths automatically.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - A panel of eight judges with narrowed paths costs a fraction of the full read and completes under a 500,000 TPM limit with concurrency 1.
+  metrics: []
+technical_notes: |
+  The ceiling on a provider-stated wait is 120 seconds: long enough for a
+  tokens-per-minute window to clear, short enough that a genuinely stuck provider
+  still surfaces as an error.

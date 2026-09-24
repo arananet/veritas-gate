@@ -503,6 +503,9 @@ checks:
 execution:
   allow: [pytest]                   # nothing runs unless it is listed here
 
+judge_paths:                        # optional; narrow what each judge reads
+  citations: [paper/manuscript.md]  # unlisted judges read the whole artifact
+
 pricing:                            # optional; without it you get tokens only
   currency: USD
   rates:

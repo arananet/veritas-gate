@@ -24,6 +24,8 @@ from veritas.repair.permissions import RepairPermissions
 if TYPE_CHECKING:  # the ledger is a loop concept; importing it here would cycle
     from veritas.loop.ledger import FindingLedger
 
+JUDGE_ERROR_CATEGORY = "judge-error"
+
 # Categories that describe *missing evidence* rather than a misrepresentation of
 # evidence that exists. Resolving one of these means running something new.
 EVIDENCE_CATEGORY_HINTS = (
@@ -93,9 +95,29 @@ class RepairPlanner:
         actions: list[RepairAction] = []
         notes: list[str] = []
 
+        # A judge that failed describes the evaluation, not the artifact. Handing
+        # it to a repair agent once asked Codex to fix a provider rate limit by
+        # editing a manuscript.
+        failed_judges = sorted(
+            {
+                item.source or item.id
+                for item in result.meta_review.findings
+                if item.category == JUDGE_ERROR_CATEGORY
+            }
+        )
+        if failed_judges:
+            notes.append(
+                f"{len(failed_judges)} judge(s) could not complete "
+                f"({', '.join(failed_judges)}); their findings are not repairable. "
+                "Re-run the evaluation once the cause is resolved."
+            )
+        repairable = [
+            item for item in result.meta_review.findings if item.category != JUDGE_ERROR_CATEGORY
+        ]
+
         # Group findings that describe the same fix at the same location, so the
         # agent gets one instruction per place it has to touch.
-        for index, group in enumerate(_group(result.meta_review.findings), start=1):
+        for index, group in enumerate(_group(repairable), start=1):
             primary = max(group, key=lambda item: severity_rank(item.severity))
             action = self._action_for(
                 f"ACTION-{index:03d}", group, primary, blocking, evidence_index
