@@ -479,3 +479,68 @@ async def test_non_utf8_output_does_not_break_the_repair(tmp_path: Path) -> None
     assert seen and seen[0].startswith("caf")
     assert result.status == "completed"
     workspace.cleanup()
+
+
+# ------------------------------------------- what a worktree leaves out
+
+
+def _git_repo(tmp_path: Path) -> Path:
+    import subprocess
+
+    repo = tmp_path / "repo"
+    (repo / "paper" / "evidence").mkdir(parents=True)
+    (repo / "paper" / "manuscript.md").write_text("# Paper\n", encoding="utf-8")
+    (repo / ".gitignore").write_text("*.tar\n", encoding="utf-8")
+    for args in (
+        ["init", "-q"],
+        ["add", "-A"],
+        ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "init"],
+    ):
+        subprocess.run(["git", "-C", str(repo), *args], check=True)
+    return repo
+
+
+def test_a_worktree_records_untracked_and_ignored_files(tmp_path: Path) -> None:
+    """The loop evaluated a different artifact from the one on disk, silently."""
+    repo = _git_repo(tmp_path)
+    (repo / "paper" / "evidence" / "run.json").write_text("{}", encoding="utf-8")
+    (repo / "paper" / "evidence" / "captures.tar").write_text("x", encoding="utf-8")
+
+    workspace = open_workspace(repo / "paper", "worktree", loop_id="l", base_dir=tmp_path / "ws")
+
+    assert "evidence/run.json" in workspace.left_out
+    assert "evidence/captures.tar" in workspace.left_out
+    workspace.cleanup()
+
+
+def test_a_fully_tracked_artifact_leaves_nothing_out(tmp_path: Path) -> None:
+    repo = _git_repo(tmp_path)
+    workspace = open_workspace(repo / "paper", "worktree", loop_id="l", base_dir=tmp_path / "ws")
+    assert workspace.left_out == []
+    workspace.cleanup()
+
+
+def test_the_veritas_directory_is_never_reported(tmp_path: Path) -> None:
+    repo = _git_repo(tmp_path)
+    (repo / "paper" / ".veritas" / "runs").mkdir(parents=True)
+    (repo / "paper" / ".veritas" / "runs" / "r.json").write_text("{}", encoding="utf-8")
+    workspace = open_workspace(repo / "paper", "worktree", loop_id="l", base_dir=tmp_path / "ws")
+    assert not any(path.startswith(".veritas") for path in workspace.left_out)
+    workspace.cleanup()
+
+
+def test_a_copy_workspace_reads_the_disk_and_leaves_nothing_out(tmp_path: Path) -> None:
+    repo = _git_repo(tmp_path)
+    (repo / "paper" / "evidence" / "run.json").write_text("{}", encoding="utf-8")
+    workspace = open_workspace(repo / "paper", "copy", loop_id="l", base_dir=tmp_path / "ws")
+    assert workspace.left_out == []
+    workspace.cleanup()
+
+
+def test_an_uncommitted_edit_to_a_tracked_file_is_reported(tmp_path: Path) -> None:
+    """A fixed sentence, uncommitted, was still wrong in the worktree the loop read."""
+    repo = _git_repo(tmp_path)
+    (repo / "paper" / "manuscript.md").write_text("# Paper, corrected\n", encoding="utf-8")
+    workspace = open_workspace(repo / "paper", "worktree", loop_id="l", base_dir=tmp_path / "ws")
+    assert "manuscript.md" in workspace.left_out
+    workspace.cleanup()

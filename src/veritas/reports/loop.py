@@ -50,6 +50,32 @@ class LoopReporter:
         self.console.print(f"Budget:   up to {max_iterations} iteration(s)")
         self.console.print()
 
+    def left_out_warning(self, paths: list[str], limit: int = 12) -> None:
+        """Name the files a worktree cannot see before evaluating without them.
+
+        A worktree holds only tracked files. Untracked or ignored evidence
+        exists on disk and is absent from what the loop evaluates, so an
+        evaluation and a loop over the same repository disagreed, and neither
+        said why. The omission is often the real finding: a reviewer who
+        clones the repository gets the worktree, not the operator's disk.
+        """
+        if self.quiet or not paths:
+            return
+        self.console.print(
+            f"[yellow]{len(paths)} file(s) in the artifact differ from the last commit "
+            "(untracked, ignored or uncommitted), and this worktree is built from "
+            "the commit:[/yellow]"
+        )
+        for path in paths[:limit]:
+            self.console.print(f"  [dim]{_escape(path)}[/dim]")
+        if len(paths) > limit:
+            self.console.print(f"  [dim]... and {len(paths) - limit} more[/dim]")
+        self.console.print(
+            "  [dim]Judges will evaluate the committed version, or nothing. Commit "
+            "before running the loop, or use --workspace copy.[/dim]"
+        )
+        self.console.print()
+
     def engine_progress(self, phase: str, name: str, status: str) -> None:
         """Relay the evaluation engine's own per-judge/check progress.
 
@@ -273,14 +299,18 @@ class LoopReporter:
         self._command(f"git -C {workspace} diff -- {files[0]}")
         self.console.print()
         self.console.print("  Take all of it (run from your repository root):")
-        self._command(f"git -C {workspace} diff | git apply")
+        self._command(f"git -C {workspace} diff | git apply --3way")
         if len(files) > 1:
             self.console.print()
             self.console.print("  Take only the files you accept:")
             kept = " ".join(files[:2])
-            self._command(f"git -C {workspace} diff -- {kept} | git apply")
+            self._command(f"git -C {workspace} diff -- {kept} | git apply --3way")
         self.console.print()
-        self.console.print("  [dim]Nothing is applied until you run one of these.[/dim]")
+        self.console.print(
+            "  [dim]Nothing is applied until you run one of these. Commit your own "
+            "changes first:[/dim]"
+        )
+        self.console.print("  [dim]a three-way apply refuses files with uncommitted edits.[/dim]")
 
     def _command(self, text: str) -> None:
         """Print a command unwrapped: a path broken across lines cannot be pasted."""
