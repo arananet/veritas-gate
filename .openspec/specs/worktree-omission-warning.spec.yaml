@@ -1,0 +1,66 @@
+---
+title: Say what a worktree leaves out, and apply repairs over a moved tree
+slug: worktree-omission-warning
+type: bugfix
+status: review
+author: Claude
+created_at: '2026-09-24'
+updated_at: '2026-09-24'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  A git worktree is built from the last commit. Anything untracked or
+  git-ignored inside the artifact is absent from it, and a tracked file with
+  uncommitted edits appears in its committed form. In the run this came from,
+  a false sentence had been removed from a manuscript without committing; the
+  loop evaluated the committed manuscript, the judges quoted the sentence back,
+  and the fix looked as if it had not worked. The loop then
+  evaluated a different artifact from the one `veritas evaluate .` sees, and the
+  two disagreed: evidence findings that had cleared in an evaluation came back in
+  the loop, with nothing in either output saying why.
+
+  Opening a worktree now records which files inside the artifact were left out,
+  and the loop says so before it evaluates: how many, and which. The omission is
+  often the real finding — a reviewer who clones the repository gets the worktree,
+  not the operator's disk.
+
+  Separately, the printed command to take a repair used a plain `git apply`,
+  which refuses as soon as the operator's tree has moved since the worktree was
+  created. It now uses a three-way apply, which merges over a moved tree and
+  leaves conflict markers where it cannot.
+acceptance_criteria:
+- "Given an artifact containing untracked or git-ignored files, when a worktree workspace is opened, then those files are recorded as left out, relative to the artifact root."
+- "Given files left out of a worktree, when the loop starts, then it reports how many and names them before evaluating."
+- "Given a tracked file with uncommitted edits, when a worktree is opened, then it is reported, because the worktree holds its committed form."
+- "Given an artifact whose files are all tracked and committed, when a worktree is opened, then nothing is reported as left out."
+- "Given a copy or current workspace, when it is opened, then nothing is reported as left out, because those modes read the disk."
+- "Given the Veritas run directory inside the artifact, when omissions are computed, then it is never reported."
+- "Given a long list of omissions, when it is reported, then a bounded number are named and the remainder counted."
+- "Given a repair that changed files, when the apply commands are printed, then they use a three-way apply."
+test_plan:
+- 'Unit test: an ignored file and an untracked file inside the artifact are recorded as left out of a worktree.'
+- 'Unit test: an uncommitted edit to a tracked file is recorded.'
+- 'Unit test: a fully tracked, committed artifact records nothing left out.'
+- 'Unit test: copy and current workspaces record nothing left out.'
+- 'Unit test: .veritas contents are never reported.'
+- 'Unit test: the reporter names a bounded number of omissions and counts the rest.'
+- 'Unit test: the printed apply commands include --3way.'
+qa_notes: |
+  Nothing about what is evaluated changes: the worktree is still built from the
+  commit, as it must be for repairs to be reviewable. The warning only makes the
+  difference visible, so an operator can decide whether the omission is a
+  configuration slip or a real gap in what the repository carries.
+out_of_scope:
+- Copying untracked or ignored files into the worktree; a repair must be reviewable against a commit.
+- Reporting omissions outside the artifact's own directory.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - A loop over an artifact whose evidence directory is untracked reports that directory as left out before evaluating.
+  metrics: []
+technical_notes: |
+  Omissions are read from `git status --porcelain --ignored --untracked-files=all`
+  scoped to the artifact directory, so the answer is git's own, not a heuristic.

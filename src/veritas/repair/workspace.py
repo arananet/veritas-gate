@@ -35,6 +35,10 @@ class Workspace:
     mode: WorkspaceMode = "current"
     source: Path | None = None
     top: Path | None = None
+    # Files inside the artifact whose disk state is not in the worktree:
+    # untracked, ignored, or edited since the last commit. The loop evaluates
+    # the worktree, so it sees the committed version or nothing at all.
+    left_out: list[str] = field(default_factory=list)
     _cleanup: list[Path] = field(default_factory=list, repr=False)
     _worktree_of: Path | None = field(default=None, repr=False)
 
@@ -130,6 +134,7 @@ def open_workspace(
                 mode="worktree",
                 source=source,
                 top=target.resolve(),
+                left_out=_untracked_in(source),
                 _worktree_of=source,
             )
 
@@ -194,3 +199,40 @@ def _git(cwd: Path, *args: str) -> str | None:
     if result.returncode != 0:
         return None
     return result.stdout
+
+
+def _untracked_in(source: Path) -> list[str]:
+    """Files under ``source`` whose disk state a worktree will not have.
+
+    Git's own answer, scoped to the artifact: untracked files, ignored files,
+    and uncommitted edits to tracked ones. A worktree is built from the commit,
+    so all three differ between what the operator sees and what the loop
+    evaluates. The Veritas run directory is never reported.
+    """
+    out = _git(source, "status", "--porcelain", "--ignored", "--untracked-files=all", "--", ".")
+    if not out:
+        return []
+    top = _git(source, "rev-parse", "--show-toplevel")
+    prefix = ""
+    if top:
+        try:
+            prefix = source.resolve().relative_to(Path(top.strip()).resolve()).as_posix()
+        except ValueError:  # pragma: no cover - defensive
+            prefix = ""
+    left: list[str] = []
+    for line in out.splitlines():
+        # Every status line is a difference from the commit the worktree is
+        # built from: untracked (??), ignored (!!), and -- the case that fooled
+        # an operator into thinking a fixed sentence was still wrong -- tracked
+        # files with uncommitted edits (M, A, D, R in either column).
+        if len(line) < 4:
+            continue
+        path = line[3:].strip().strip('"')
+        if " -> " in path:  # a rename: report where it went
+            path = path.split(" -> ", 1)[1].strip().strip('"')
+        if prefix and path.startswith(prefix + "/"):
+            path = path[len(prefix) + 1 :]
+        if path == ".veritas" or path.startswith(".veritas/"):
+            continue
+        left.append(path)
+    return sorted(left)

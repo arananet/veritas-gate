@@ -532,6 +532,7 @@ def loop(
         loop_id=store.loop_id,
         base_dir=loaded_config.workspaces_dir(),
     )
+    reporter.left_out_warning(workspace.left_out)
 
     # The engine evaluates whatever is in the workspace, so repairs made there
     # are what the next evaluation sees.

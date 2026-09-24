@@ -403,3 +403,39 @@ def test_a_long_workspace_path_is_not_wrapped_mid_command() -> None:
     LoopReporter(console).summary(result)
     out = console.export_text()
     assert f"git -C {result.workspace} diff" in out
+
+
+def test_the_left_out_warning_names_a_bounded_number() -> None:
+    from rich.console import Console
+
+    from veritas.reports.loop import LoopReporter
+
+    console = Console(width=200, record=True)
+    LoopReporter(console).left_out_warning([f"evidence/f{i}.json" for i in range(20)], limit=5)
+    out = console.export_text()
+    assert "20 file(s)" in out
+    assert "evidence/f0.json" in out
+    assert "evidence/f19.json" not in out
+    assert "and 15 more" in out
+
+
+def test_no_left_out_warning_when_nothing_is_left_out() -> None:
+    from rich.console import Console
+
+    from veritas.reports.loop import LoopReporter
+
+    console = Console(width=200, record=True)
+    LoopReporter(console).left_out_warning([])
+    assert console.export_text() == ""
+
+
+def test_apply_commands_use_a_three_way_apply() -> None:
+    from rich.console import Console
+
+    from veritas.reports.loop import LoopReporter
+
+    console = Console(width=300, record=True)
+    LoopReporter(console).summary(_finished(["a.md", "b.md"]))
+    out = console.export_text()
+    assert "git -C /tmp/ws diff | git apply --3way" in out
+    assert "Commit your own changes first" in out
