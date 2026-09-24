@@ -1,0 +1,65 @@
+---
+title: Read through a symlinked directory inside an artifact
+slug: follow-symlinked-directories
+type: bugfix
+status: review
+author: Claude
+created_at: '2026-09-24'
+updated_at: '2026-09-24'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  Evidence that is regenerated should be cited by a name that survives
+  regeneration, and a symlink to the current run is the ordinary way to do that.
+  Veritas then could not read it: the directory walk skipped symlinked
+  directories silently, so every file cited through the stable name was invisible
+  to the judges while the same files, under their real suffixed name, were read
+  normally.
+
+  The result was the worst kind of finding: judges reporting that a manuscript's
+  central evidence was "not supplied at the cited path", correctly, because
+  Veritas had not looked there — and an author rewriting correct prose to satisfy
+  it.
+
+  The walk now follows symlinked directories. Two conditions bound it: a target
+  resolving outside the artifact root is not read, so a link cannot pull in the
+  rest of the filesystem, and each resolved directory is visited once, so a cycle
+  terminates instead of recursing forever.
+acceptance_criteria:
+- "Given a symlinked directory inside the artifact, when segments are read, then the files beneath it are read under the symlinked path."
+- "Given a file reachable both by its real path and through a symlink, when segments are read, then each path is reported once and the content is identical."
+- "Given a symlink whose target resolves outside the artifact root, when segments are read, then nothing beneath it is read."
+- "Given a symlink cycle, when segments are read, then the walk terminates and each real directory is visited once."
+- "Given a symlink to a file rather than a directory, when segments are read, then it is read as an ordinary file."
+- "Given a broken symlink, when segments are read, then it is skipped without raising."
+- "Given an artifact with no symlinks, when segments are read, then the result is what it was before."
+- "Given a symlinked directory, when the artifact's file list is produced, then the files beneath it appear in it."
+test_plan:
+- 'Unit test: a file under a symlinked directory is read, under the symlinked path.'
+- 'Unit test: the same file reached by both paths appears once per path with identical content.'
+- 'Unit test: a symlink pointing outside the artifact root contributes nothing.'
+- 'Unit test: a cycle terminates.'
+- 'Unit test: a symlink to a file is read.'
+- 'Unit test: a broken symlink is skipped without raising.'
+- 'Unit test: an artifact without symlinks reads exactly as before.'
+- 'Integration test: an evaluation over an artifact citing evidence through a stable symlink finds it.'
+qa_notes: |
+  Following links widens what is read, so the escape guard matters: without it,
+  a link to the home directory would put a person's files into a judge prompt.
+  The guard resolves the target and requires it to stay under the artifact root.
+out_of_scope:
+- Following symlinks that leave the artifact root, under any configuration.
+- Reporting a broken symlink as a finding; reference-integrity already reports a cited path that does not resolve.
+- Deduplicating content read through two different paths; both paths are cited in real documents and both should be readable.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - A manuscript citing evidence through a stable current-run symlink is evaluated against that evidence.
+  metrics: []
+technical_notes: |
+  `Path.rglob` does not descend into symlinked directories, and did so silently.
+  The walk is explicit now, so the escape and cycle rules are visible where they
+  are enforced rather than being a property of a library call.
