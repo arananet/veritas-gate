@@ -532,7 +532,7 @@ def loop(
         loop_id=store.loop_id,
         base_dir=loaded_config.workspaces_dir(),
     )
-    reporter.left_out_warning(workspace.left_out)
+    reporter.left_out_warning(_within_artifact(workspace.left_out, artifact.paths))
 
     # The engine evaluates whatever is in the workspace, so repairs made there
     # are what the next evaluation sees.
@@ -707,3 +707,22 @@ def _resolve_evaluation(root: Path, reference: str) -> EvaluationResult:
 
 if __name__ == "__main__":  # pragma: no cover
     app()
+
+
+def _within_artifact(paths: list[str], configured: list[str]) -> list[str]:
+    """Keep only files the judges would read: those under ``artifact.paths``.
+
+    A repository holds node_modules, run logs and editor litter that nobody
+    evaluates. Reporting all of it buried the one omission that mattered under
+    thirteen thousand that did not.
+    """
+    if not configured:
+        return paths
+    prefixes = [item.strip("/").removeprefix("./") for item in configured]
+    kept: list[str] = []
+    for path in paths:
+        for prefix in prefixes:
+            if prefix in ("", ".") or path == prefix or path.startswith(prefix + "/"):
+                kept.append(path)
+                break
+    return kept
