@@ -25,7 +25,9 @@ ln -sfn "browser-run-$SUFFIX" evidence/current-run
 
 Cite `evidence/current-run/report.json` everywhere, and say which run is
 canonical in one place, such as an evidence README, rather than in twenty
-links.
+links. Veritas reads through the link, so the files beneath it are evaluated
+under the stable name the documents cite. A link that points outside the
+directory it sits in is not followed.
 
 ## Do not describe your repository's state inside the repository
 

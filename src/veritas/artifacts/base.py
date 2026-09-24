@@ -187,16 +187,69 @@ def relative_path(root: Path, target: Path) -> str:
 
 
 def _read_tree(root: Path, directory: Path) -> list[ArtifactSegment]:
+    """Walk a directory, following symlinked directories inside the artifact.
+
+    `Path.rglob` does not descend into a symlinked directory, and did so
+    silently: evidence cited through a stable `current-run` link — the ordinary
+    way to cite something that is regenerated under a new name each time — was
+    invisible to every judge, while the same files under their real name were
+    read normally. The walk is explicit now, so the two rules that bound it are
+    visible where they are enforced.
+    """
     segments: list[ArtifactSegment] = []
-    for path in sorted(directory.rglob("*")):
-        if not path.is_file():
-            continue
-        if _is_skipped(root, path):
-            continue
-        segment = _read_file(root, path)
-        if segment is not None:
-            segments.append(segment)
-    return segments
+    walked: set[Path] = set()
+    try:
+        boundary = directory.resolve()
+    except OSError:  # pragma: no cover - a broken link or a vanished path
+        return []
+
+    def walk(current: Path, ancestors: frozenset[Path]) -> None:
+        try:
+            real = current.resolve()
+        except OSError:  # pragma: no cover - a broken link or a vanished path
+            return
+        # The boundary is the directory the operator configured, not the
+        # artifact root: a configured path may legitimately sit outside the root
+        # (and is reported by external_paths), but a symlink found inside it may
+        # not wander further, or a link to a home directory would put files
+        # nobody offered into a judge's prompt.
+        if real != boundary and not _within(real, boundary):
+            return
+        # A cycle is a directory reappearing beneath itself. Reaching one real
+        # directory by two different spellings is not a cycle: documents cite
+        # both the stable link and the real name, and both must be readable.
+        if real in ancestors or current in walked:
+            return
+        walked.add(current)
+        try:
+            entries = sorted(current.iterdir())
+        except OSError:  # pragma: no cover - unreadable directory
+            return
+        for entry in entries:
+            if _is_skipped(root, entry):
+                continue
+            try:
+                is_dir = entry.is_dir()
+                is_file = entry.is_file()
+            except OSError:  # a broken symlink
+                continue
+            if is_dir:
+                walk(entry, ancestors | {real})
+            elif is_file:
+                segment = _read_file(root, entry)
+                if segment is not None:
+                    segments.append(segment)
+
+    walk(directory, frozenset())
+    return sorted(segments, key=lambda item: item.path)
+
+
+def _within(target: Path, root: Path) -> bool:
+    try:
+        target.relative_to(root)
+    except ValueError:
+        return False
+    return True
 
 
 def _is_skipped(root: Path, path: Path) -> bool:
