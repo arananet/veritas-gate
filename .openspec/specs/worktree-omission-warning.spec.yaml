@@ -39,6 +39,7 @@ acceptance_criteria:
 - "Given a copy or current workspace, when it is opened, then nothing is reported as left out, because those modes read the disk."
 - "Given the Veritas run directory inside the artifact, when omissions are computed, then it is never reported."
 - "Given a long list of omissions, when it is reported, then a bounded number are named and the remainder counted."
+- "Given files outside artifact.paths, such as node_modules or run logs, when omissions are reported, then they are not listed, because no judge reads them."
 - "Given a repair that changed files, when the apply commands are printed, then they use a three-way apply."
 test_plan:
 - 'Unit test: an ignored file and an untracked file inside the artifact are recorded as left out of a worktree.'
@@ -48,6 +49,7 @@ test_plan:
 - 'Unit test: .veritas contents are never reported.'
 - 'Unit test: the reporter names a bounded number of omissions and counts the rest.'
 - 'Unit test: the printed apply commands include --3way.'
+- 'Unit test: the reported omissions are limited to files under artifact.paths.'
 qa_notes: |
   Nothing about what is evaluated changes: the worktree is still built from the
   commit, as it must be for repairs to be reviewable. The warning only makes the

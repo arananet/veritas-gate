@@ -439,3 +439,19 @@ def test_apply_commands_use_a_three_way_apply() -> None:
     out = console.export_text()
     assert "git -C /tmp/ws diff | git apply --3way" in out
     assert "Commit your own changes first" in out
+
+
+def test_the_left_out_warning_is_scoped_to_artifact_paths() -> None:
+    """Thirteen thousand node_modules files buried the one that mattered."""
+    from veritas.cli import _within_artifact
+
+    left = [
+        "node_modules/x/index.js",
+        ".DS_Store",
+        ".openspec/runs/a.log",
+        "paper/manuscript.md",
+        "paper/evidence/run/report.json",
+        "paperwork.txt",
+    ]
+    kept = _within_artifact(left, ["paper/manuscript.md", "paper/evidence"])
+    assert kept == ["paper/manuscript.md", "paper/evidence/run/report.json"]
