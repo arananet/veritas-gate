@@ -455,3 +455,17 @@ def test_the_left_out_warning_is_scoped_to_artifact_paths() -> None:
     ]
     kept = _within_artifact(left, ["paper/manuscript.md", "paper/evidence"])
     assert kept == ["paper/manuscript.md", "paper/evidence/run/report.json"]
+
+
+def test_the_left_out_warning_ignores_files_no_judge_reads() -> None:
+    """Twenty .pyc files hid an uncommitted veritas.yaml."""
+    from veritas.cli import _within_artifact
+
+    left = [
+        "src/__pycache__/harness.cpython-313.pyc",
+        "spec/.DS_Store",
+        "src/harness.py",
+        "veritas.yaml",
+        "CITATION.cff",
+    ]
+    assert _within_artifact(left, ["."]) == ["src/harness.py", "veritas.yaml", "CITATION.cff"]

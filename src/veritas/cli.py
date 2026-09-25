@@ -794,6 +794,18 @@ def _within_artifact(paths: list[str], configured: list[str]) -> list[str]:
     evaluates. Reporting all of it buried the one omission that mattered under
     thirteen thousand that did not.
     """
+    from veritas.artifacts.base import SKIP_DIRECTORIES, TEXT_FILENAMES, TEXT_SUFFIXES
+
+    def readable(path: str) -> bool:
+        # Bytecode, .DS_Store and cache directories never reach a judge, so an
+        # omission among them is noise that hides the ones that matter.
+        parts = path.split("/")
+        if any(part in SKIP_DIRECTORIES for part in parts[:-1]):
+            return False
+        name = parts[-1]
+        return name in TEXT_FILENAMES or Path(name).suffix.lower() in TEXT_SUFFIXES
+
+    paths = [path for path in paths if readable(path)]
     if not configured:
         return paths
     prefixes = [item.strip("/").removeprefix("./") for item in configured]

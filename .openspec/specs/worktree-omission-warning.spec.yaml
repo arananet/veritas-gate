@@ -40,6 +40,7 @@ acceptance_criteria:
 - "Given the Veritas run directory inside the artifact, when omissions are computed, then it is never reported."
 - "Given a long list of omissions, when it is reported, then a bounded number are named and the remainder counted."
 - "Given files outside artifact.paths, such as node_modules or run logs, when omissions are reported, then they are not listed, because no judge reads them."
+- "Given omitted files a judge would never read, such as bytecode, .DS_Store or files under cache directories, when omissions are reported, then they are not listed."
 - "Given a repair that changed files, when the apply commands are printed, then they use a three-way apply."
 test_plan:
 - 'Unit test: an ignored file and an untracked file inside the artifact are recorded as left out of a worktree.'
