@@ -84,12 +84,20 @@ def next_steps(
         if other:
             steps.append(Step(f"{len(other)} configuration issue(s): {_titles(other)}."))
     if to_fix:
-        steps.append(
-            Step(
-                f"{len(to_fix)} blocking issue(s) are fixable in the work. Commit first, then:",
-                "veritas loop . --workspace worktree" if can_repair else None,
+        if can_repair:
+            steps.append(
+                Step(
+                    f"{len(to_fix)} blocking issue(s) are fixable in the work. Commit first, then:",
+                    "veritas loop . --workspace worktree",
+                )
             )
-        )
+        else:
+            steps.append(
+                Step(
+                    f"{len(to_fix)} blocking issue(s) remain in the work: "
+                    f"{_titles(to_fix)}. Fix them by hand, then run `veritas evaluate .`."
+                )
+            )
     if decisions:
         steps.append(Step(f"{len(decisions)} need your decision: {_titles(decisions)}."))
     if declared:

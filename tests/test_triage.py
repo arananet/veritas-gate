@@ -182,3 +182,19 @@ def test_missing_archival_files_point_to_scaffold() -> None:
         can_repair=False,
     )
     assert any(s.command == "veritas scaffold ." for s in steps)
+
+
+def test_without_a_repair_command_the_step_names_the_issues_not_a_dangling_then() -> None:
+    """Inside the loop it said "Commit first, then:" and nothing followed."""
+    from veritas.reports.next_steps import next_steps
+
+    steps = next_steps(
+        [make(id="A", title="Suite count unsupported", disposition="artifact")],
+        "REVISE",
+        can_repair=False,
+        blocking={"A"},
+    )
+    text = steps[0].text
+    assert "then:" not in text
+    assert "Suite count unsupported" in text
+    assert "veritas evaluate ." in text

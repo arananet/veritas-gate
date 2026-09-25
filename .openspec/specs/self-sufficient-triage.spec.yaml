@@ -63,6 +63,7 @@ acceptance_criteria:
 - "Given findings accepted as known risks, when next steps are built, then they are left out."
 - "Given the gate's list of blocking findings, when next steps count blocking issues, then they count exactly those, not every major finding."
 - "Given a failed archival-files check, when next steps are built, then they point to veritas scaffold."
+- "Given blocking issues and no repair command to offer, when next steps are built, then the step names the issues and says to fix them by hand and re-evaluate."
 - "Given thesis entries in veritas.yaml, when a judge runs, then its system prompt lists them as the author's intended claims with the bounding instruction."
 - "Given thesis entries, when a repair prompt is rendered, then it lists them as claims to preserve and bound, never delete."
 - "Given no thesis, when prompts are built, then no thesis section appears."
