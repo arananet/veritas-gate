@@ -36,7 +36,21 @@ TEXT_SUFFIXES = {
     ".rs",
     ".java",
     ".rb",
+    # Missed formats: a CITATION.cff listed in artifact.paths was skipped, and
+    # one paper's reproduction scripts and test suite (.mjs) never reached a
+    # judge, which then reported them as missing.
+    ".cff",
+    ".mjs",
+    ".cjs",
+    ".tsx",
+    ".jsx",
+    ".r",
+    ".jl",
+    ".tsv",
 }
+
+# Well-known files that carry no suffix at all.
+TEXT_FILENAMES = {"LICENSE", "LICENCE", "NOTICE", "COPYING", "Makefile", "Dockerfile", "CITATION"}
 
 DEFAULT_MAX_FILE_CHARS = 400_000
 
@@ -159,7 +173,7 @@ class Artifact:
 
 
 def _read_file(root: Path, target: Path) -> ArtifactSegment | None:
-    if target.suffix.lower() not in TEXT_SUFFIXES:
+    if target.suffix.lower() not in TEXT_SUFFIXES and target.name not in TEXT_FILENAMES:
         return None
     try:
         text = target.read_text(encoding="utf-8", errors="replace")

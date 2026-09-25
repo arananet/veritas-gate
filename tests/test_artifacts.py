@@ -72,3 +72,25 @@ def test_a_broken_symlink_is_skipped_without_raising(tmp_path: Path) -> None:
 
     artifact = Artifact(id="a", type="paper", root=tmp_path, paths=["evidence"])
     assert artifact.file_list() == ["evidence/real.txt"]
+
+
+def test_formats_research_repositories_use_are_read(tmp_path: Path) -> None:
+    """A CITATION.cff and a paper's .mjs test suite were silently skipped."""
+    names = [
+        "CITATION.cff",
+        "paper.mjs",
+        "a.cjs",
+        "b.tsx",
+        "c.jsx",
+        "d.r",
+        "e.jl",
+        "LICENSE",
+        "Makefile",
+    ]
+    for name in names:
+        (tmp_path / name).write_text("x\n", encoding="utf-8")
+    (tmp_path / "image.png").write_bytes(b"\x89PNG")
+    artifact = Artifact(id="a", type="paper", root=tmp_path, paths=["."])
+    listed = set(artifact.file_list())
+    assert set(names) <= listed
+    assert "image.png" not in listed

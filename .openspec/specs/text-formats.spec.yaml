@@ -1,0 +1,41 @@
+---
+title: Read the text formats research repositories actually use
+slug: text-formats
+type: bugfix
+status: review
+author: Claude
+created_at: '2026-09-25'
+updated_at: '2026-09-25'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  Files are read only when their suffix is on a list, and the list missed
+  formats real repositories use. A CITATION.cff listed in artifact.paths was
+  silently skipped, as were ES-module scripts and tests (.mjs), JSX/TSX, R and
+  Julia sources, and suffixless files such as LICENSE and Makefile. In one
+  paper the reproduction scripts and the paper's own test suite were .mjs and
+  never reached a judge, which then reported them as missing.
+
+  The list now covers these, and a short set of well-known suffixless
+  filenames is read too. Binary and unknown formats are still skipped.
+acceptance_criteria:
+- "Given a CITATION.cff, .mjs, .cjs, .tsx, .jsx, .r or .jl file under artifact.paths, when segments are read, then it is read as text."
+- "Given a suffixless LICENSE, NOTICE, Makefile or Dockerfile, when segments are read, then it is read as text."
+- "Given an unknown or binary format, when segments are read, then it is still skipped."
+test_plan:
+- 'Unit test: each added suffix and filename is read.'
+- 'Unit test: a .png is still skipped.'
+qa_notes: |
+  More files can now reach judges; `veritas files .` shows exactly which.
+out_of_scope:
+- Reading PDFs or notebooks.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - A repository whose scripts are .mjs has them evaluated.
+  metrics: []
+technical_notes: |
+  Suffixes stay an allow-list, so nothing binary is ever sent to a model.
