@@ -94,3 +94,29 @@ the claim — those need judgement, and that is what judges are for.
 
 We paid eight judges, three times over, to find a directory that was not there.
 A path lookup would have found it in the first second of the first run.
+
+## Give each judge only what it needs
+
+By default every judge reads the whole artifact. On a real paper that was about
+300,000 input tokens per judge, eight judges per evaluation, roughly ten dollars
+a round — and eight large requests at once exceeded a 500,000 tokens-per-minute
+limit. `judge_paths` narrows each judge to the paths it actually needs:
+
+```yaml
+concurrency: 2           # fewer judges in flight at once, under your rate limit
+
+judge_paths:
+  archival:       [paper/manuscript.md, paper/evidence/README.md, paper/REPRODUCTION.md]
+  citations:      [paper/manuscript.md]
+  statistics:     [paper/manuscript.md, tests]
+  reproducibility: [paper/REPRODUCTION.md, paper/EXECUTION.md, paper/evidence/README.md]
+  # methodology, evidence, repo-consistency and adversarial keep the whole artifact:
+  # their job is to notice when the code and the paper disagree.
+```
+
+A judge not listed reads everything, so narrowing is always a deliberate choice.
+A judge that cannot see the code cannot tell you the code contradicts the paper.
+Deterministic checks are unaffected and still see the whole artifact.
+
+When a provider rate-limits a request and says how long to wait, Veritas waits
+that long (up to two minutes) instead of burning its retries in a few seconds.

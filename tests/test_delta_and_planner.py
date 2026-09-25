@@ -245,3 +245,37 @@ def test_permission_reason_names_the_setting_to_change() -> None:
     assert "repair.permissions.experiments" in permissions.reason_for("experiment")
     with pytest.raises(AttributeError):
         _ = permissions.no_such_permission_attribute
+
+
+# ------------------------------------------- judge errors are not repairable
+
+
+def _judge_error(judge: str) -> Finding:
+    from veritas.judges.base import error_result
+
+    return error_result(judge, "openai request failed (429): rate limit").findings[0]
+
+
+def test_a_judge_error_produces_no_repair_action() -> None:
+    """Codex was once asked to fix a provider rate limit by editing a manuscript."""
+    result = evaluation([_judge_error("adversarial")])
+    plan = RepairPlanner(RepairPermissions()).plan(result, 1)
+    assert plan.actions == []
+
+
+def test_the_plan_notes_name_the_judges_that_failed() -> None:
+    result = evaluation([_judge_error("adversarial"), _judge_error("citations")])
+    plan = RepairPlanner(RepairPermissions()).plan(result, 1)
+    note = " ".join(plan.notes)
+    assert "adversarial" in note and "citations" in note
+    assert "Re-run" in note
+
+
+def test_other_findings_still_produce_actions_beside_a_judge_error() -> None:
+    result = evaluation(
+        [_judge_error("adversarial"), finding("A-1", "Broken reference to evidence")],
+        blocking=["A-1"],
+    )
+    plan = RepairPlanner(RepairPermissions()).plan(result, 1)
+    assert len(plan.actions) == 1
+    assert plan.actions[0].finding_ids == ["A-1"]

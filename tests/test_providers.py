@@ -492,3 +492,40 @@ def test_a_decoded_field_of_the_wrong_shape_still_fails() -> None:
     with pytest.raises(ProviderError) as exc:
         parse_structured(text, _Schema)
     assert "_Schema" in str(exc.value)
+
+
+# ------------------------------------------- honouring a stated wait
+
+
+def test_a_429_body_saying_try_again_in_seconds_is_honoured() -> None:
+    """The old backoff capped at 8s and spent every attempt before a TPM limit cleared."""
+    from veritas.providers.http import _stated_wait
+
+    body = "Rate limit reached ... Please try again in 33.024s. Visit ..."
+    wait = _stated_wait({}, body)
+    assert wait is not None and wait >= 33.0
+
+
+def test_a_wait_in_milliseconds_is_honoured() -> None:
+    from veritas.providers.http import _stated_wait
+
+    wait = _stated_wait({}, "Please try again in 500ms.")
+    assert wait is not None and 0.5 <= wait < 3
+
+
+def test_a_retry_after_header_is_honoured() -> None:
+    from veritas.providers.http import _stated_wait
+
+    assert (_stated_wait({"retry-after": "12"}, "") or 0) >= 12
+
+
+def test_a_stated_wait_is_capped() -> None:
+    from veritas.providers.http import MAX_STATED_WAIT, _stated_wait
+
+    assert _stated_wait({}, "try again in 9999s") == MAX_STATED_WAIT
+
+
+def test_no_stated_wait_leaves_the_backoff_in_charge() -> None:
+    from veritas.providers.http import _stated_wait
+
+    assert _stated_wait({}, "internal server error") is None

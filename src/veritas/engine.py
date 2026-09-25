@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -247,6 +247,7 @@ class Engine:
         self, artifact: Artifact, context: EvaluationContext
     ) -> tuple[list[JudgeResult], list[JudgeStability]]:
         judges = self.build_judges()
+        scoped = self._scoped_artifacts(artifact, judges)
         semaphore = asyncio.Semaphore(max(1, self.config.concurrency))
         repeats = max(1, self.options.runs)
 
@@ -255,7 +256,7 @@ class Engine:
                 if attempt == 0:
                     self.options.progress("judge", judge.name, "start")
                 # Judges are blind: each call sees only the artifact and the context.
-                result = await judge.evaluate(artifact, context)
+                result = await judge.evaluate(scoped.get(judge.name, artifact), context)
                 if attempt == 0:
                     self.options.progress(
                         "judge",
@@ -282,6 +283,39 @@ class Engine:
             primary.append(_worst_result(attempts))
             stability.append(_stability_for(judge.name, attempts))
         return primary, stability
+
+    def _scoped_artifacts(self, artifact: Artifact, judges: list[LLMJudge]) -> dict[str, Artifact]:
+        """Give each judge named in ``judge_paths`` only the segments it needs.
+
+        Segments come from the configured artifact, so a judge can never see
+        more than artifact.paths offers; checks are unaffected and read it all.
+        """
+        wanted = self.config.judge_paths
+        if not wanted:
+            return {}
+        known = {spec.name for spec in self.profile.definition.judges}
+        unknown = sorted(set(wanted) - known)
+        if unknown:
+            raise ConfigError(
+                f"judge_paths names unknown judge(s): {', '.join(unknown)}. "
+                f"Profile '{self.profile.name}' defines: {', '.join(sorted(known))}"
+            )
+        segments = artifact.segments()
+        scoped: dict[str, Artifact] = {}
+        for judge in judges:
+            prefixes = [item.strip("/").removeprefix("./") for item in wanted.get(judge.name, [])]
+            if not prefixes:
+                continue
+            kept = [
+                segment
+                for segment in segments
+                if any(
+                    segment.path == prefix or segment.path.startswith(prefix + "/")
+                    for prefix in prefixes
+                )
+            ]
+            scoped[judge.name] = replace(artifact, _segments=kept)
+        return scoped
 
     def _meta_provider(self) -> ModelProvider | None:
         role = self.profile.definition.meta_model_role

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 import random
+import re
 import ssl
 import sys
 from pathlib import Path
@@ -161,9 +162,44 @@ async def post_json(
                 last_error = ProviderError(
                     f"{spec.provider} request failed ({response.status_code}): {detail}"
                 )
+                stated = _stated_wait(response.headers, detail)
+                if attempt < attempts - 1:
+                    await asyncio.sleep(stated if stated is not None else _backoff(attempt))
+                continue
             if attempt < attempts - 1:
                 await asyncio.sleep(_backoff(attempt))
     raise ProviderError(f"{spec.provider} request failed after {attempts} attempts: {last_error}")
+
+
+MAX_STATED_WAIT = 120.0
+_TRY_AGAIN = re.compile(r"try again in\s+([0-9]+(?:\.[0-9]+)?)\s*(ms|s)\b", re.IGNORECASE)
+
+
+def _stated_wait(headers: Any, body: str) -> float | None:
+    """How long the provider asked us to wait, if it said.
+
+    A tokens-per-minute 429 names its wait -- "try again in 33.024s" -- and the
+    old backoff, capped at eight seconds, spent every attempt before the limit
+    cleared. Honouring the stated wait turns a busy minute into a pause instead
+    of a failed judge. Capped, so a stuck provider still surfaces as an error.
+    """
+    seconds: float | None = None
+    try:
+        ms = headers.get("retry-after-ms")
+        if ms:
+            seconds = float(ms) / 1000
+        elif headers.get("retry-after"):
+            seconds = float(headers.get("retry-after"))
+    except (TypeError, ValueError):
+        seconds = None
+    if seconds is None:
+        match = _TRY_AGAIN.search(body or "")
+        if match:
+            value = float(match.group(1))
+            seconds = value / 1000 if match.group(2).lower() == "ms" else value
+    if seconds is None:
+        return None
+    return min(MAX_STATED_WAIT, max(0.0, seconds) + 1.0)
 
 
 def _backoff(attempt: int) -> float:

@@ -1,0 +1,49 @@
+---
+title: A judge that failed is not something to repair in the artifact
+slug: planner-ignores-judge-errors
+type: bugfix
+status: review
+author: Claude
+created_at: '2026-09-24'
+updated_at: '2026-09-24'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  When a judge cannot complete — a rate limit, an unparseable response, missing
+  credentials — its failure is recorded as a finding so the gate cannot pass on
+  an incomplete panel. The repair planner then treated that finding like any
+  other and handed it to the repair agent. In a real run it asked Codex to fix a
+  provider rate limit by editing the manuscript.
+
+  A judge error describes the evaluation, not the artifact. The planner now
+  leaves such findings out of the plan and says in the plan's notes which judges
+  failed, so the operator can re-run once the cause is gone. The gate still
+  refuses to pass while any judge has failed.
+acceptance_criteria:
+- "Given a finding whose category is judge-error, when a repair plan is built, then no action is created for it."
+- "Given judge errors in an evaluation, when the plan is built, then its notes name the judges that could not complete and say the evaluation should be re-run."
+- "Given an evaluation with no judge errors, when a plan is built, then it is unchanged."
+- "Given a plan whose only findings were judge errors, when the loop reaches it, then no repair is dispatched."
+- "Given judge errors, when the gate is evaluated, then it still does not pass."
+test_plan:
+- 'Unit test: a judge-error finding produces no action.'
+- 'Unit test: the plan notes name the failed judges.'
+- 'Unit test: a plan built from only judge-error findings has no actions.'
+- 'Unit test: other findings in the same evaluation still produce actions.'
+qa_notes: |
+  Only the planner changes. The finding is still recorded and the gate still
+  treats a failed judge as a failed evaluation.
+out_of_scope:
+- Retrying a failed judge automatically within the same iteration.
+- Changing how the gate treats judge errors.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - A rate-limited judge produces a plan note, not a repair action.
+  metrics: []
+technical_notes: |
+  Judge errors are identified by the category that error_result assigns, which
+  is the single place such findings are created.

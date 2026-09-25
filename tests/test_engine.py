@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 
 from veritas.artifacts import Artifact
-from veritas.config import load_config
+from veritas.config import ConfigError, load_config
 from veritas.engine import Engine, EngineOptions
 from veritas.profiles import load_profile
 from veritas.reports import render_markdown
@@ -262,3 +262,50 @@ async def test_missing_model_config_is_a_clear_error(tmp_path: Path, repo_root) 
     profile = load_profile("generic-document", repo_root)
     with pytest.raises(ConfigError, match="no model configured"):
         await Engine(config, profile).run(artifact_for(tmp_path))
+
+
+# ------------------------------------------- per-judge scope
+
+
+def _two_file_artifact(tmp_path: Path) -> Artifact:
+    (tmp_path / "doc.md").write_text("# Design\n", encoding="utf-8")
+    (tmp_path / "src").mkdir(exist_ok=True)
+    (tmp_path / "src" / "code.ts").write_text("export const x = 1;\n", encoding="utf-8")
+    return Artifact(id="doc", type="document", root=tmp_path, paths=["doc.md", "src"])
+
+
+def test_a_judge_named_in_judge_paths_sees_only_those_segments(
+    tmp_path: Path, repo_root: Path
+) -> None:
+    """Every judge reading everything cost ~300k input tokens per judge."""
+    config = config_for(
+        tmp_path, "http://127.0.0.1:9", repo_root, judge_paths={"structure": ["doc.md"]}
+    )
+    engine = Engine(config, load_profile("generic-document", repo_root))
+    artifact = _two_file_artifact(tmp_path)
+
+    scoped = engine._scoped_artifacts(artifact, engine.build_judges())
+
+    assert [s.path for s in scoped["structure"].segments()] == ["doc.md"]
+    # A judge not named keeps the whole artifact.
+    assert "evidence" not in scoped
+    assert {s.path for s in artifact.segments()} == {"doc.md", "src/code.ts"}
+
+
+def test_judge_paths_cannot_widen_beyond_the_artifact(tmp_path: Path, repo_root: Path) -> None:
+    (tmp_path / "secret.txt").write_text("not offered\n", encoding="utf-8")
+    config = config_for(
+        tmp_path, "http://127.0.0.1:9", repo_root, judge_paths={"structure": ["secret.txt"]}
+    )
+    engine = Engine(config, load_profile("generic-document", repo_root))
+    scoped = engine._scoped_artifacts(_two_file_artifact(tmp_path), engine.build_judges())
+    assert scoped["structure"].segments() == []
+
+
+def test_an_unknown_judge_in_judge_paths_is_rejected(tmp_path: Path, repo_root: Path) -> None:
+    config = config_for(
+        tmp_path, "http://127.0.0.1:9", repo_root, judge_paths={"nonexistent": ["doc.md"]}
+    )
+    engine = Engine(config, load_profile("generic-document", repo_root))
+    with pytest.raises(ConfigError, match="nonexistent"):
+        engine._scoped_artifacts(_two_file_artifact(tmp_path), engine.build_judges())
