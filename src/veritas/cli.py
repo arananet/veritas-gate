@@ -159,6 +159,14 @@ gate:
 # Nothing executes unless it is listed here.
 execution:
   allow: []
+
+# Facts about this work, for `veritas scaffold` (CITATION.cff, LICENSING.md).
+# Stable facts -- your name, ORCID, preferred licences -- belong once in
+# ~/.config/veritas/metadata.yaml; these override them per work.
+# metadata:
+#   title: "The title of this work"
+#   repository: https://github.com/you/this-work
+#   doi: 10.5281/zenodo.NNNNNNN
 """
 
 
@@ -262,6 +270,72 @@ def files(
         f"and this profile runs {len(judges)} of them."
     )
     console.print("[dim]Skipped: binaries, PDFs and any format Veritas cannot read as text.[/dim]")
+
+
+@app.command()
+def scaffold(
+    path: Annotated[Path, typer.Argument(help="Project directory.")] = Path("."),
+    profile: Annotated[str | None, typer.Option(help="Profile name to use.")] = None,
+    config: Annotated[Path | None, typer.Option(help="Path to veritas.yaml.")] = None,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", help="Show what would be written, write nothing.")
+    ] = False,
+) -> None:
+    """Create the citation and licensing files the profile expects, if missing.
+
+    Built from metadata you declare -- never invented -- and never overwriting.
+    """
+    from veritas.scaffold import resolve_metadata, user_metadata_path
+    from veritas.scaffold import scaffold as run_scaffold
+
+    target = path.resolve()
+    loaded_config, loaded_profile = _prepare(target, profile, config)
+    if not loaded_profile.definition.scaffold:
+        console.print(f"Profile '{loaded_profile.name}' declares no files to scaffold.")
+        return
+    try:
+        metadata = resolve_metadata(loaded_config.metadata)
+        outcomes = run_scaffold(loaded_config.root, loaded_profile, metadata, dry_run=dry_run)
+    except ConfigError as exc:
+        raise _fail(str(exc)) from exc
+
+    marks = {
+        "written": "[green]✓ written[/green]",
+        "would write": "[cyan]→ would write[/cyan]",
+        "exists": "[dim]· exists, left untouched[/dim]",
+        "missing metadata": "[yellow]! needs metadata[/yellow]",
+    }
+    for outcome in outcomes:
+        line = f"  {marks[outcome.action]}  {outcome.path}"
+        if outcome.detail:
+            line += f"  [yellow]({outcome.detail})[/yellow]"
+        console.print(line)
+
+    if any(item.action == "missing metadata" for item in outcomes):
+        console.print()
+        console.print(
+            "Declare stable facts once in "
+            f"[bold]{user_metadata_path()}[/bold], and per-work facts under "
+            "[bold]metadata:[/bold] in veritas.yaml:"
+        )
+        console.print(_METADATA_EXAMPLE)
+
+
+_METADATA_EXAMPLE = """  # ~/.config/veritas/metadata.yaml -- once, for every project
+  authors:
+    - given: Your
+      family: Name
+      orcid: 0000-0000-0000-0000
+  licence:
+    code: MIT
+    content: CC-BY-4.0
+
+  # veritas.yaml -- per work
+  metadata:
+    title: "The title of this work"
+    repository: https://github.com/you/this-work
+    # doi: 10.5281/zenodo.NNNNNNN   once you have deposited it
+"""
 
 
 @app.command()

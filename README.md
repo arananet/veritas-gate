@@ -557,6 +557,7 @@ spots do not decide the outcome.
 | `veritas loop --dry-run` | Show what autopilot would do, and stop |
 | `veritas loop --resume` | Continue from the previous loop's ledger |
 | `veritas loop --verbose` | Print the repair agent's full output as it runs |
+| `veritas scaffold` | Create missing citation and licensing files from your declared metadata |
 | `veritas loop-report` | Show the report from the latest loop |
 | `veritas diff <a> <b>` | Compare two evaluations issue by issue |
 | `veritas profiles` | List every discoverable profile |

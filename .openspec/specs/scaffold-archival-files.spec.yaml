@@ -1,0 +1,66 @@
+---
+title: Create the citation and licensing files a paper needs, from declared metadata
+slug: scaffold-archival-files
+type: feature
+status: review
+author: Claude
+created_at: '2026-09-25'
+updated_at: '2026-09-25'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  A paper repository needs a handful of files that have nothing to do with its
+  argument and are easy to forget: a CITATION.cff so it can be cited, a statement
+  of which licence covers the code and which covers the text, figures and data,
+  the author's ORCID. Evaluating a real paper surfaced each of them as a finding,
+  one at a time, over several rounds.
+
+  Veritas now checks for them and can create the ones that are missing. It never
+  invents their contents. Metadata is declared once by the operator: stable facts
+  — name, ORCID, preferred licences — in a user-level file that every project
+  inherits, and per-paper facts — title, repository, DOI once one exists — in the
+  project's veritas.yaml. `veritas scaffold` renders the profile's templates from
+  that metadata, writes only files that do not exist, and refuses a file whose
+  required metadata is missing, naming the field.
+
+  What gets scaffolded is declared by the profile, so a profile for another
+  discipline can require different files without any change to Veritas.
+acceptance_criteria:
+- "Given a profile declaring scaffold entries and complete metadata, when scaffold runs, then each missing file is written from its template."
+- "Given a scaffold target that already exists, when scaffold runs, then it is left untouched and reported as such."
+- "Given a scaffold entry whose required metadata field is missing, when scaffold runs, then that file is not written and the missing field is named."
+- "Given --dry-run, when scaffold runs, then nothing is written and the files it would write are printed."
+- "Given a user-level metadata file and a project metadata block, when metadata is resolved, then project values override user values field by field."
+- "Given no metadata anywhere, when scaffold runs, then nothing is written and the operator is told where to declare it."
+- "Given a generated CITATION.cff, when it is parsed as YAML, then it is valid Citation File Format with the declared authors, ORCIDs and licence, and a DOI only if one was declared."
+- "Given the scientific-paper profile, when an artifact lacks CITATION.cff or a licensing statement, then an archival-files check reports each missing file."
+- "Given a scaffold template referencing an unknown metadata field, when it is rendered, then scaffold fails naming the field rather than writing an empty value."
+test_plan:
+- 'Unit test: missing files are written; existing files are not touched.'
+- 'Unit test: a missing required field blocks that file and is named.'
+- 'Unit test: dry-run writes nothing.'
+- 'Unit test: project metadata overrides user metadata per field.'
+- 'Unit test: the generated CITATION.cff parses and carries authors, ORCIDs, licence, and no DOI unless declared.'
+- 'Unit test: an unknown template field is an error.'
+- 'Unit test: the scientific-paper profile declares CITATION.cff and LICENSING.md and checks for them.'
+qa_notes: |
+  Scaffold writes new files only. It does not edit a manuscript or README; where
+  a statement belongs inside an existing document, the evaluation reports it and
+  the operator writes it.
+out_of_scope:
+- Minting a DOI or depositing an archive.
+- Editing existing files, including README and the manuscript.
+- Choosing a licence on the operator's behalf.
+- Looking up an ORCID or author details from any external service.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - A new paper repository with user-level metadata gets CITATION.cff and LICENSING.md from one command.
+  metrics: []
+technical_notes: |
+  CITATION.cff is generated as structured YAML rather than from a text template,
+  so quoting and lists are always valid. Other files use plain templates with
+  {{dotted.field}} placeholders resolved against the metadata.

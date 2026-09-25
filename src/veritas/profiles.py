@@ -45,6 +45,20 @@ class JudgeSpec(BaseModel):
     description: str = ""
 
 
+class ScaffoldEntry(BaseModel):
+    """A file a profile expects the artifact to have, and how to create it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    path: str
+    description: str = ""
+    # Exactly one of: a built-in generator, or a template in the profile's
+    # scaffold/ directory with {{dotted.field}} placeholders.
+    generator: str | None = None
+    template: str | None = None
+    requires: list[str] = Field(default_factory=list)
+
+
 class ProfileDefinition(BaseModel):
     """Parsed ``profile.yaml``."""
 
@@ -60,6 +74,7 @@ class ProfileDefinition(BaseModel):
     checks: dict[str, CheckConfig] = Field(default_factory=dict)
     gate: GatePolicy = Field(default_factory=GatePolicy)
     rubric: dict[str, Any] = Field(default_factory=dict)
+    scaffold: list[ScaffoldEntry] = Field(default_factory=list)
 
 
 @dataclass(slots=True)

@@ -120,3 +120,44 @@ Deterministic checks are unaffected and still see the whole artifact.
 
 When a provider rate-limits a request and says how long to wait, Veritas waits
 that long (up to two minutes) instead of burning its retries in a few seconds.
+
+## Declare who you are once, and let the files follow
+
+A citable paper needs a `CITATION.cff`, a licence for its code, and a statement
+of which licence covers the text, figures and data. None of it is about the
+argument, and all of it is easy to forget. The `scientific-paper` profile checks
+for these files (`archival-files`), and `veritas scaffold` creates the missing
+ones from metadata you declare. It never invents a value and never overwrites a
+file.
+
+Facts that do not change between papers go in `~/.config/veritas/metadata.yaml`,
+once:
+
+```yaml
+authors:
+  - given: Your
+    family: Name
+    orcid: 0000-0000-0000-0000
+licence:
+  code: MIT
+  content: CC-BY-4.0
+```
+
+Facts about this paper go in its `veritas.yaml`, and override the user file
+field by field:
+
+```yaml
+metadata:
+  title: "The title of this work"
+  repository: https://github.com/you/this-work
+  # doi: 10.5281/zenodo.NNNNNNN   add it once you have deposited
+```
+
+```bash
+veritas scaffold . --dry-run   # what would be written
+veritas scaffold .             # write the missing files
+```
+
+The full `LICENSE` text is not scaffolded: choose and add it yourself. A DOI
+appears in `CITATION.cff` only once you declare one; re-run `scaffold` after
+deleting the old file, or edit it by hand.

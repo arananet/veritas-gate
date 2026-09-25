@@ -79,6 +79,17 @@ checks:
       - results
       - conclusion
 
+  # The files a citable, licensable paper needs. Missing ones are reported
+  # here and created from your declared metadata by `veritas scaffold`.
+  archival-files:
+    type: required-paths
+    enabled: true
+    severity_on_failure: minor
+    required_paths:
+      - CITATION.cff
+      - LICENSE
+      - LICENSING.md
+
   reference-integrity:
     type: reference-integrity
     enabled: true
@@ -114,3 +125,17 @@ gate:
   max_minor: 20
   require_checks: []
   warn_on_minor: true
+
+# Files `veritas scaffold` creates when missing, from metadata the operator
+# declares once. Nothing is invented: an entry whose required metadata is absent
+# is not written. LICENSE itself is not scaffolded -- the full licence text is
+# the operator's to choose and add.
+scaffold:
+  - path: CITATION.cff
+    description: Citation metadata, so the work can be cited correctly.
+    generator: citation-cff
+    requires: [title, authors, licence.content]
+  - path: LICENSING.md
+    description: Which licence covers the code and which covers text, figures and data.
+    template: LICENSING.md
+    requires: [licence.code, licence.content]

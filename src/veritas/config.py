@@ -382,6 +382,43 @@ class PricingConfig(BaseModel):
     rates: dict[str, ModelPrice] = Field(default_factory=dict)
 
 
+class Author(BaseModel):
+    """One author, as the operator declared them. Nothing here is looked up."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    given: str
+    family: str
+    orcid: str | None = None
+    affiliation: str | None = None
+
+
+class Licences(BaseModel):
+    """Which licence covers the code, and which covers text, figures and data."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    code: str | None = None
+    content: str | None = None
+
+
+class ProjectMetadata(BaseModel):
+    """Facts about the work that scaffolded files are built from.
+
+    Declared once by the operator -- stable facts in a user-level file, per-paper
+    facts in veritas.yaml -- and never invented: a scaffolded file whose required
+    field is missing is not written.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str | None = None
+    authors: list[Author] = Field(default_factory=list)
+    repository: str | None = None
+    licence: Licences = Field(default_factory=Licences)
+    doi: str | None = None
+
+
 class VeritasConfig(BaseModel):
     """The parsed ``veritas.yaml``."""
 
@@ -406,6 +443,7 @@ class VeritasConfig(BaseModel):
     # Narrowing is deliberate: a judge that cannot see the code cannot report
     # that the code contradicts the paper.
     judge_paths: dict[str, list[str]] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
     concurrency: int = 4
     root: Path = Field(default_factory=Path.cwd, exclude=True)
 
