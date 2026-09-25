@@ -224,3 +224,14 @@ allows, that contradiction is reported as a defect.
 Every evaluation and every loop ends with **Next steps**: what to change in
 `veritas.yaml`, what a repair run can fix, what only you can decide, and how many
 declared limitations need nothing from you — with the command for each.
+
+## Measure the gate itself
+
+`veritas benchmark benchmarks/manifest.yaml --config veritas.yaml` runs
+Veritas on papers whose problems are already known and reports how many it
+found (recall) and what else it reported. A case's source can be a local
+path, a git URL or an arXiv URL; each known issue gives regular expressions a
+finding must match, a minimum severity, and where the issue is documented.
+Unmatched findings are candidates to read, not proven false positives. After
+refining patterns, `--rescore .veritas/benchmark/<run>` rescores the saved
+runs for free.

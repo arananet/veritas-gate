@@ -701,6 +701,88 @@ def diff(
 # ----------------------------------------------------------------- helpers
 
 
+@app.command()
+def benchmark(
+    manifest: Annotated[Path, typer.Argument(help="Benchmark manifest (YAML).")],
+    config: Annotated[
+        Path | None, typer.Option(help="veritas.yaml supplying models and pricing.")
+    ] = None,
+    case: Annotated[
+        list[str] | None, typer.Option("--case", help="Run only these cases (repeatable).")
+    ] = None,
+    rescore: Annotated[
+        Path | None,
+        typer.Option(help="Rescore a saved benchmark directory without calling any model."),
+    ] = None,
+) -> None:
+    """Measure Veritas against papers whose problems are already known.
+
+    Each case is fetched (local path, git URL or arXiv URL), evaluated blind,
+    and its findings matched against the known issues. Reports recall and the
+    findings no known issue explains.
+    """
+    from veritas import benchmark as bench
+
+    manifest_path = manifest.resolve()
+    try:
+        loaded = bench.load_manifest(manifest_path)
+    except ConfigError as exc:
+        raise _fail(str(exc)) from exc
+    cases = [c for c in loaded.cases if not case or c.id in case]
+    if not cases:
+        raise _fail("no case matches --case")
+
+    if rescore is not None:
+        out = rescore.resolve()
+        scores = []
+        for item in cases:
+            run_dir = out / "runs" / item.id
+            if not run_dir.is_dir():
+                scores.append(bench.CaseScore(case=item.id, status="error", error="no saved run"))
+                continue
+            scores.append(bench.score_case(item, load_run(run_dir)))
+    else:
+        config_path = config.resolve() if config else find_config(Path.cwd())
+        if config_path is None:
+            raise _fail("give --config: a veritas.yaml whose models the benchmark uses")
+        try:
+            base = load_config(config_path, root=config_path.parent)
+        except ConfigError as exc:
+            raise _fail(str(exc)) from exc
+        out = bench.benchmark_dir(base.root)
+        cache = base.root / ".veritas" / "benchmark" / "cache"
+        scores = []
+        for item in cases:
+            console.print(f"[bold]{item.id}[/bold] ...")
+            try:
+                source = bench.fetch(item, manifest_path.parent, cache)
+                result = asyncio.run(bench.evaluate_case(item, source, base))
+            except (ConfigError, ProviderError, OSError) as exc:
+                console.print(f"  [red]error:[/red] {exc}")
+                scores.append(bench.CaseScore(case=item.id, status="error", error=str(exc)))
+                continue
+            write_run(out / "runs" / item.id, result, render_markdown(result))
+            scored = bench.score_case(item, result)
+            console.print(
+                f"  {scored.gate}: detected {scored.detected}/{len(scored.issues)}, "
+                f"{len(scored.unmatched)} unmatched finding(s)"
+            )
+            scores.append(scored)
+
+    from datetime import UTC, datetime
+
+    result_score = bench.BenchmarkScore(created_at=datetime.now(UTC), cases=scores)
+    (out / "score.json").write_text(json.dumps(result_score.to_json(), indent=2), encoding="utf-8")
+    markdown = bench.render_markdown(result_score)
+    (out / "score.md").write_text(markdown, encoding="utf-8")
+    recall = result_score.recall
+    console.print(
+        f"\nDetected [bold]{result_score.detected}/{result_score.known}[/bold] known issues"
+        + (f" (recall {recall:.0%})" if recall is not None else "")
+    )
+    console.print(f"[dim]report: {out / 'score.md'}[/dim]")
+
+
 def _prepare(target: Path, profile: str | None, config: Path | None) -> tuple[Any, Profile]:
     """Load configuration and the profile for a target path."""
     config_path = config.resolve() if config else find_config(target)

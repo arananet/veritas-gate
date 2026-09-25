@@ -1,0 +1,41 @@
+---
+title: Measure Veritas against papers whose problems are already known
+slug: benchmark
+type: feature
+status: review
+author: Claude
+created_at: '2026-09-25'
+updated_at: '2026-09-25'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  `veritas benchmark MANIFEST` evaluates each case -- a local path, a git
+  URL or an arXiv URL -- blind, with the operator's models, and matches its
+  findings against the case's known issues (regular expressions, with a
+  minimum severity). It reports recall, and the findings no known issue
+  explains as candidates for a human to read, never as proven false
+  positives. `--rescore DIR` rescores saved runs without calling a model.
+  A starter manifest ships with one planted case.
+acceptance_criteria:
+- "Given a bare URL, when the manifest loads, then arXiv, git and local sources are recognised."
+- "Given a known issue, when a finding matches every pattern at or above min_severity, then the issue is detected."
+- "Given an arXiv source, when it is unpacked, then paths escaping the directory are refused and a PDF-only paper is a clear error."
+- "Given the operator's config, when a case runs, then only models and pricing carry over, not its scopes, checks, gate or thesis."
+- "Given a saved benchmark, when --rescore runs, then scores are recomputed from saved runs with no model call."
+test_plan:
+- 'tests/test_benchmark.py covers each criterion end to end against a local endpoint.'
+qa_notes: |
+  Fetching downloads; it never runs anything from what it downloads.
+out_of_scope:
+- Curating real papers' known issues; that needs a human source for each.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - The planted case reports which of its four defects were found.
+  metrics: [recall, unmatched findings per case]
+technical_notes: |
+  Output goes to .veritas/benchmark/<timestamp>/ (runs/, score.json, score.md);
+  remote sources are cached under .veritas/benchmark/cache/<case>.

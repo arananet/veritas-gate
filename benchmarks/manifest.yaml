@@ -1,0 +1,43 @@
+# Veritas benchmark: papers whose problems are already known.
+#
+#   veritas benchmark benchmarks/manifest.yaml --config veritas.yaml
+#
+# A case's source is a local path, a git URL (with an optional ref) or an
+# arXiv URL; a bare string is read as a URL. Known issues must come from
+# somewhere a human can check -- planted on purpose, an OpenReview review, a
+# published erratum or retraction -- and `source` says where.
+description: Starter set. Add real papers with documented problems.
+cases:
+  - id: planted-overclaim
+    source: {path: planted/overclaim}
+    profile: scientific-paper
+    paths: [paper]
+    notes: Four defects planted on purpose.
+    known_issues:
+      - id: accuracy-mismatch
+        description: The abstract claims 87% accuracy; the table shows 12/16 (75%).
+        match: ["87|75|12/16"]
+        min_severity: major
+        source: planted
+      - id: generalisation
+        description: Claims about all large language models rest on one 7B model.
+        match: ["all (large )?language models|single model|one model|generali[sz]"]
+        min_severity: major
+        source: planted
+      - id: dangling-results
+        description: The cited per-question results file does not exist.
+        match: ["results\\.csv"]
+        source: planted
+      - id: no-uncertainty
+        description: '"Significantly" with n=16 and no test or interval.'
+        match: ["signific|uncertaint|confidence interval|statistical|sample size|n ?= ?16|16 questions"]
+        source: planted
+
+  # Example of a real case (fill in the known issues from where they are documented):
+  # - id: some-paper
+  #   source: https://arxiv.org/abs/2401.00001
+  #   known_issues:
+  #     - id: reviewer-1-baseline
+  #       description: Missing comparison with the standard baseline.
+  #       match: ["baseline"]
+  #       source: https://openreview.net/forum?id=...
