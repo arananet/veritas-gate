@@ -1,0 +1,41 @@
+---
+title: Check a LaTeX paper's source the way arXiv will receive it
+slug: arxiv-package-check
+type: feature
+status: review
+author: Claude
+created_at: '2026-09-25'
+updated_at: '2026-09-25'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  arXiv publishes the LaTeX source and builds it itself, without BibTeX.
+  The `arxiv-package` check reads the main .tex file and everything it
+  inputs, and reports missing inputs, figures and bibliographies, a missing
+  .bbl, undefined citation keys, cited references lacking author, title or
+  year, malformed DOIs, comments that look private, and a package over the
+  50 MB limit. It reads files only: nothing is compiled or fetched.
+acceptance_criteria:
+- "Given a main file inputting a missing file, figure or .bib, when the check runs, then each is reported at severity_on_failure with its location."
+- "Given \\bibliography without a .bbl beside the main file, when the check runs, then a minor finding says arXiv will not build the bibliography."
+- "Given a cited key absent from every supplied .bib, when the check runs, then it is reported."
+- "Given a comment containing TODO, FIXME or reviewer, when the check runs, then it is reported as would-be-published; an escaped \\% is not a comment."
+- "Given a package over max_package_mb, when the check runs, then it is reported."
+- "Given no .tex with \\documentclass, or several without a target, when the check runs, then it is skipped with the reason."
+test_plan:
+- 'Unit tests in tests/test_check_arxiv.py cover each criterion.'
+qa_notes: |
+  Nothing is executed: compiling stays an opt-in, allow-listed command check.
+out_of_scope:
+- Compiling the source; resolving DOIs over the network.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - A LaTeX paper missing its .bbl is flagged before upload.
+  metrics: []
+technical_notes: |
+  Regex-based LaTeX and BibTeX reading, deliberately shallow: it recognises
+  the common commands, not every macro a package can define.

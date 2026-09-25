@@ -200,6 +200,8 @@ class CheckConfig(BaseModel):
     # artifact. Excluding a lockfile or a PDF is how an evaluation is kept
     # affordable, so this is advisory by default.
     severity_on_unsupplied: Literal["info", "minor", "major", "critical"] = "minor"
+    # For arxiv-package: arXiv's limit on a submission's total size.
+    max_package_mb: float = 50.0
 
 
 class ExecutionConfig(BaseModel):

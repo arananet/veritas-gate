@@ -103,6 +103,21 @@ A claim resting only on them is reported as unverified (minor, declared), not
 as missing evidence. `veritas files` shows how many files are withheld. A path
 both in `paths` and `withheld` is supplied.
 
+## Check the package before arXiv does
+
+For a LaTeX paper the `arxiv-package` check (on in `scientific-paper`)
+reports what would break or leak on arXiv: missing `\input`, figures or
+`.bib`, a missing `.bbl` (arXiv does not run BibTeX), undefined citation
+keys, incomplete references, malformed DOIs, private comments (arXiv
+publishes the source) and packages over 50 MB. It reads files only. With
+several `.tex` files carrying `\documentclass`, name yours:
+
+```yaml
+checks:
+  arxiv-package:
+    target: paper/v3/main.tex
+```
+
 ## Let the cheap checks be cheap
 
 A dangling path, a missing DOI, a link to a mutable branch: each is a rule, and

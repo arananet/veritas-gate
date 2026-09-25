@@ -101,6 +101,17 @@ checks:
       - paper/manuscript.md
       - paper/REPRODUCTION.md
 
+  # Will the LaTeX source survive arXiv? Missing inputs and figures, a
+  # missing .bbl (arXiv does not run BibTeX), undefined citation keys,
+  # incomplete references, private comments and the 50 MB limit. Reads files
+  # only: nothing is compiled or fetched. Skipped for papers with no .tex main
+  # file; set target when several .tex files carry \documentclass.
+  arxiv-package:
+    type: arxiv-package
+    enabled: true
+    severity_on_failure: major
+    max_package_mb: 50
+
   # Off by default: these are conventions, not universal requirements, and a
   # profile should not fail a paper for a convention its venue does not hold.
   # Enable in your veritas.yaml and set `target` to your manuscript.
