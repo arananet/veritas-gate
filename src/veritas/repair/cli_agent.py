@@ -65,6 +65,7 @@ class GenericCLIRepairAgent:
         *,
         prompt: str | None = None,
         on_output: Callable[[str], None] | None = None,
+        thesis: list[str] | None = None,
     ) -> None:
         self.config = config
         self.permissions = permissions or RepairPermissions()
@@ -72,6 +73,7 @@ class GenericCLIRepairAgent:
         # Called with each line the agent writes, as it writes it. Whatever the
         # configured tool prints; Veritas neither parses nor interprets it.
         self.on_output = on_output
+        self.thesis = list(thesis or [])
 
     async def repair(
         self,
@@ -212,6 +214,7 @@ class GenericCLIRepairAgent:
             f"- Modify methodology: {_yesno(self.permissions.methodology)}",
             f"- Alter scientific claims: {_yesno(self.permissions.scientific_claims)}",
             "",
+            *self._thesis_lines(),
             f"## Repair plan (iteration {plan.iteration})",
             "",
             f"The machine-readable plan is at `{plan_file}`.",
@@ -234,6 +237,22 @@ class GenericCLIRepairAgent:
                 ]
             )
         return "\n".join(sections)
+
+    def _thesis_lines(self) -> list[str]:
+        """What the work sets out to show: bound it to the evidence, never delete it."""
+        if not self.thesis:
+            return []
+        return [
+            "## Claims to preserve",
+            "",
+            "The work sets out to demonstrate the following. Keep each one. Where a",
+            "finding says the evidence does not support it as written, narrow the",
+            "wording to what the evidence does support; do not delete the claim, and",
+            "do not weaken it further than the evidence requires.",
+            "",
+            *[f"- {item}" for item in self.thesis],
+            "",
+        ]
 
     def _environment(self) -> dict[str, str]:
         env: dict[str, str] = {}

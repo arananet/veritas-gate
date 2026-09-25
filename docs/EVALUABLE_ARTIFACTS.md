@@ -161,3 +161,33 @@ veritas scaffold .             # write the missing files
 The full `LICENSE` text is not scaffolded: choose and add it yourself. A DOI
 appears in `CITATION.cff` only once you declare one; re-run `scaffold` after
 deleting the old file, or edit it by hand.
+
+## Say what you set out to show
+
+```yaml
+thesis:
+  - "Reusing an identifier overwrites in shared mappings and is retained in separate instances."
+  - "Model-only tool rejection depends on the installed host handler, not the SDK default."
+```
+
+Judges receive these as your intended claims, to be evaluated like any other —
+listing a claim does not make it established. What changes is the advice: where
+the evidence falls short, a judge recommends the narrowest wording it supports
+instead of removal. The repair agent is told to keep each claim and bound it to
+its evidence, never delete it.
+
+## Declare your limitations, and they stop blocking
+
+Judges read the work's own limitations and threats-to-validity sections first.
+A problem the work explicitly acknowledges — and acknowledges no more weakly than
+the evidence requires — is reported as `declared`, with the acknowledging
+passage quoted, and weighed as minor. A critical finding is never softened this
+way, and a judge that calls something declared without quoting where is not
+believed. If the abstract or conclusion claims more than the declared limitation
+allows, that contradiction is reported as a defect.
+
+## Read the last block first
+
+Every evaluation and every loop ends with **Next steps**: what to change in
+`veritas.yaml`, what a repair run can fix, what only you can decide, and how many
+declared limitations need nothing from you — with the command for each.

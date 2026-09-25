@@ -444,6 +444,11 @@ class VeritasConfig(BaseModel):
     # that the code contradicts the paper.
     judge_paths: dict[str, list[str]] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    # What the work sets out to demonstrate, in the author's words. Judges
+    # evaluate these like any other claim; where evidence falls short they
+    # recommend the narrowest wording it supports rather than removal. The
+    # repair agent is told to preserve and bound them, never delete them.
+    thesis: list[str] = Field(default_factory=list)
     concurrency: int = 4
     root: Path = Field(default_factory=Path.cwd, exclude=True)
 

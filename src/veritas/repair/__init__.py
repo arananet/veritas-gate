@@ -35,7 +35,9 @@ __all__ = [
 
 
 def build_repair_agent(
-    config: RepairConfig, on_output: Callable[[str], None] | None = None
+    config: RepairConfig,
+    on_output: Callable[[str], None] | None = None,
+    thesis: list[str] | None = None,
 ) -> RepairAgent:
     """Instantiate the configured agent.
 
@@ -48,7 +50,9 @@ def build_repair_agent(
     if provider == "mock":
         return MockRepairAgent(permissions=config.permissions)
     if provider in ("generic-cli", "cli"):
-        return GenericCLIRepairAgent(config.agent, config.permissions, on_output=on_output)
+        return GenericCLIRepairAgent(
+            config.agent, config.permissions, on_output=on_output, thesis=thesis
+        )
     raise ConfigError(
         f"unknown repair agent provider '{provider}'; available providers: generic-cli, mock"
     )
