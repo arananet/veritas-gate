@@ -343,6 +343,11 @@ class ArtifactConfig(BaseModel):
     # Per-file character cap on what reaches a judge. Raise it for a long
     # manuscript; lower it only to control cost on a large tree.
     max_file_chars: int = 400_000
+    # Files that exist in the repository but are deliberately not supplied —
+    # raw traces too large for any request, for instance. Judges are told they
+    # exist, so their absence is weighed as unverified rather than missing.
+    withheld: list[str] = Field(default_factory=list)
+    withheld_reason: str | None = None
 
 
 class ModelPrice(BaseModel):

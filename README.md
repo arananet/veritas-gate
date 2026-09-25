@@ -506,6 +506,8 @@ execution:
 thesis:                             # optional; what the work sets out to show
   - "The claim your evidence must support"
 
+# artifact.withheld: [globs]          # optional; files that exist but are not sent
+#   (with withheld_reason). Judges treat their absence as declared, not a defect.
 judge_paths:                        # optional; narrow what each judge reads
   citations: [paper/manuscript.md]  # unlisted judges read the whole artifact
 

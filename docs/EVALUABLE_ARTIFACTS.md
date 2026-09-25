@@ -85,6 +85,24 @@ discarded. Then say plainly what the retained runs do *not* establish — two
 runs from one machine in one session rule out flakiness, not independent
 reproduction.
 
+## Name what you withhold
+
+Raw evidence is often too large to send: 320 per-repetition traces can exceed
+a provider's tokens-per-minute limit on their own. Supply the aggregates, and
+name the rest instead of leaving it out silently:
+
+```yaml
+artifact:
+  withheld:
+    - evidence/20260713T191740Z/CB-VAL-*
+  withheld_reason: "Raw traces archived with the release; too large for the judges' token limit."
+```
+
+Each judge is told these files exist and that their absence is not a defect.
+A claim resting only on them is reported as unverified (minor, declared), not
+as missing evidence. `veritas files` shows how many files are withheld. A path
+both in `paths` and `withheld` is supplied.
+
 ## Let the cheap checks be cheap
 
 A dangling path, a missing DOI, a link to a mutable branch: each is a rule, and

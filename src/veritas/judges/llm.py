@@ -19,6 +19,7 @@ from veritas.models.finding import Finding
 from veritas.providers.base import ModelProvider, ProviderError
 from veritas.security import EVALUATION_RULES, UNTRUSTED_PREAMBLE, wrap_untrusted
 from veritas.triage import TRIAGE_RULES, declared, normalise
+from veritas.withheld import withheld_section
 
 NO_EVIDENCE_PENALTY = 0.6
 
@@ -103,6 +104,8 @@ class LLMJudge:
             parts.append(f"Rubric (authoritative, from the profile): {context.rubric}")
         if context.thesis:
             parts.append(thesis_section(context.thesis))
+        if context.withheld:
+            parts.append(withheld_section(context.withheld, context.withheld_reason))
         return "\n\n".join(part for part in parts if part.strip())
 
     def user_prompt(self, artifact: Artifact) -> str:

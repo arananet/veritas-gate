@@ -29,6 +29,7 @@ from veritas.providers.base import ProviderError
 from veritas.repair import RepairPlanner, build_repair_agent, open_workspace
 from veritas.reports import ConsoleReporter, LoopReporter, render_loop_report, render_markdown
 from veritas.runs import latest_run_dir, load_run, unique_run_dir, write_run
+from veritas.withheld import resolve_withheld
 
 USAGE_ERROR = 4
 
@@ -213,6 +214,9 @@ def files(
     segments = artifact.segments()
 
     judges = [spec.name for spec in loaded_profile.definition.judges if spec.enabled]
+    withheld = resolve_withheld(
+        artifact.root, loaded_config.artifact.withheld, set(artifact.file_list())
+    )
     total_chars = sum(len(segment.text) for segment in segments)
     # Deliberately rough, and rounded down in the wording: this is a sense of
     # scale before spending money, not a billing estimate.
@@ -232,6 +236,7 @@ def files(
                     ],
                     "judges": judges,
                     "approximate_tokens_per_judge": per_judge_tokens,
+                    "withheld": withheld,
                 }
             )
         )
@@ -240,6 +245,8 @@ def files(
     console.print(f"Artifact: [bold]{target}[/bold]")
     console.print(f"Profile:  [bold]{loaded_profile.name}[/bold]")
     console.print(f"Paths:    {', '.join(artifact.paths)}")
+    if withheld:
+        console.print(f"Withheld: {len(withheld)} files (named to judges, not sent)")
     console.print()
 
     if not segments:

@@ -25,6 +25,8 @@ class EvaluationContext:
     artifact_type: str = "document"
     notes: dict[str, Any] = field(default_factory=dict)
     thesis: list[str] = field(default_factory=list)
+    withheld: list[str] = field(default_factory=list)
+    withheld_reason: str | None = None
 
 
 @runtime_checkable

@@ -1,0 +1,54 @@
+---
+title: Tell judges which files exist but are withheld, so absence is not a defect
+slug: withheld-evidence
+type: feature
+status: review
+author: Claude
+created_at: '2026-09-25'
+updated_at: '2026-09-25'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  A benchmark's raw evidence — 320 per-repetition traces, about 600,000
+  tokens — could not be sent to any judge within a 500,000 tokens-per-minute
+  limit, so the operator supplied the aggregates instead. Nine of sixteen
+  blocking findings, including both criticals, then reported the evidence as
+  missing. The judges could not tell "does not exist" from "exists and is
+  archived, but was not supplied for size".
+
+  `artifact.withheld` lists paths or glob patterns that exist in the
+  repository but are deliberately not supplied, with an optional reason. Each
+  judge is told which files these are and that their absence from the
+  supplied content is not a defect: a claim resting only on them is reported
+  as unverified, weighed as minor with disposition declared. A judge may
+  still report a claim that nothing supplied or withheld could support, and
+  a contradiction between supplied files is unaffected.
+acceptance_criteria:
+- "Given withheld patterns, when an evaluation runs, then each judge's prompt lists the matching files and the rule that their absence is not a defect."
+- "Given more matching files than the listing limit, when the prompt is built, then a bounded number are named and the remainder counted by directory."
+- "Given a withheld pattern matching nothing, when an evaluation runs, then it is ignored rather than listed."
+- "Given a withheld path also in artifact.paths, when the artifact is read, then it is supplied, not withheld."
+- "Given no withheld patterns, when prompts are built, then no withheld section appears."
+- "Given veritas files, when withheld patterns match, then the listing states how many files are withheld."
+test_plan:
+- 'Unit test: withheld files and the rule appear in the judge prompt; absent when unset.'
+- 'Unit test: the listing is bounded and counts the rest.'
+- 'Unit test: patterns that match nothing are ignored.'
+- 'Unit test: a path both supplied and withheld is treated as supplied.'
+qa_notes: |
+  Withholding changes how absence is weighed, not what is sent. A judge still
+  sees nothing of a withheld file's content and must not treat it as evidence.
+out_of_scope:
+- Sending withheld files in chunks or summarising them.
+- Verifying that withheld files are actually archived.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - A benchmark with aggregated evidence supplied and raw traces withheld is not failed for missing evidence.
+  metrics: []
+technical_notes: |
+  Patterns resolve against the repository root with glob semantics; the
+  listing names files relative to the root, like every other path judges see.

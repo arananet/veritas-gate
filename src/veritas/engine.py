@@ -51,6 +51,7 @@ from veritas.usage import (
     call_from_metadata,
     summarize,
 )
+from veritas.withheld import resolve_withheld
 
 ProgressFn = Callable[[str, str, str], None]
 """``(phase, name, status)`` — status is one of ``start``, ``ok``, ``warn``, ``fail``."""
@@ -174,6 +175,10 @@ class Engine:
             rubric=self.profile.definition.rubric,
             artifact_type=artifact.type,
             thesis=list(self.config.thesis),
+            withheld=resolve_withheld(
+                artifact.root, self.config.artifact.withheld, set(artifact.file_list())
+            ),
+            withheld_reason=self.config.artifact.withheld_reason,
         )
 
         check_results = [] if self.options.skip_checks else await self._run_checks(artifact)
