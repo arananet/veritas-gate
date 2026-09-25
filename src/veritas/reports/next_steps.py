@@ -21,21 +21,47 @@ class Step:
     command: str | None = None
 
 
-def next_steps(findings: list[Finding], gate_status: str, *, can_repair: bool) -> list[Step]:
-    """Ordered steps: configuration first, then repairs, then decisions."""
+def next_steps(
+    findings: list[Finding],
+    gate_status: str,
+    *,
+    can_repair: bool,
+    accepted: set[str] | None = None,
+    blocking: set[str] | None = None,
+) -> list[Step]:
+    """Ordered steps: configuration first, then repairs, then decisions.
+
+    A finding the operator accepted as a known risk asks nothing more of them,
+    so it is left out. When the gate says which findings block, that is what
+    counts as blocking -- not a severity guess, which once reported four
+    blocking issues beside a gate that listed one.
+    """
     if gate_status == "PASS":
         return [Step("Nothing blocks this work. Commit it, and deposit the version you cite.")]
 
-    config = [f for f in findings if f.disposition == "configuration"]
-    to_fix = [
-        f
-        for f in findings
-        if f.disposition == "artifact" and severity_rank(f.severity) >= _BLOCKING
-    ]
-    decisions = [f for f in findings if f.disposition == "decision"]
-    declared = [f for f in findings if f.disposition == "declared"]
+    accepted = accepted or set()
+    live = [f for f in findings if f.id not in accepted]
+    config = [f for f in live if f.disposition == "configuration"]
+    if blocking is not None:
+        to_fix = [f for f in live if f.disposition == "artifact" and f.id in blocking]
+    else:
+        to_fix = [
+            f
+            for f in live
+            if f.disposition == "artifact" and severity_rank(f.severity) >= _BLOCKING
+        ]
+    decisions = [f for f in live if f.disposition == "decision"]
+    declared = [f for f in live if f.disposition == "declared"]
+    missing_files = [f for f in live if f.category == "check/archival-files"]
 
     steps: list[Step] = []
+    if missing_files:
+        steps.append(
+            Step(
+                "Citation or licensing files are missing. Create them from your declared metadata:",
+                "veritas scaffold .",
+            )
+        )
     if config:
         failed = [f for f in config if f.category == "judge-error"]
         unsupplied = [f for f in config if f.category.endswith("/unsupplied")]

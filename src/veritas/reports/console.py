@@ -354,7 +354,13 @@ def _money(value: float | None, currency: str | None) -> str:
 
 def print_next_steps(console: Console, result: EvaluationResult, *, can_repair: bool) -> None:
     """Say what to do next, grouped by who acts, in a handful of lines."""
-    steps = next_steps(result.meta_review.findings, result.gate.status, can_repair=can_repair)
+    steps = next_steps(
+        result.meta_review.findings,
+        result.gate.status,
+        can_repair=can_repair,
+        accepted=set(result.gate.accepted_findings),
+        blocking=set(result.gate.blocking_findings),
+    )
     if not steps:
         return
     console.print()

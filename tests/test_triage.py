@@ -146,3 +146,39 @@ def test_the_repair_prompt_says_preserve_and_bound_never_delete() -> None:
 
     bare = GenericCLIRepairAgent(RepairAgentConfig(), RepairPermissions())
     assert "Claims to preserve" not in bare.render_prompt(plan, Path("p"), Path("r"))
+
+
+def test_accepted_findings_ask_nothing_more() -> None:
+    """Next steps once nagged about exclusions the operator had already accepted."""
+    from veritas.reports.next_steps import next_steps
+
+    findings = [
+        make(id="U", category="check/references/unsupplied", disposition="configuration"),
+        make(id="A", disposition="artifact"),
+    ]
+    steps = next_steps(findings, "REVISE", can_repair=True, accepted={"U"}, blocking={"A"})
+    text = " ".join(s.text for s in steps)
+    assert "artifact.paths" not in text
+    assert "1 blocking issue(s)" in text
+
+
+def test_blocking_follows_the_gate_not_a_severity_guess() -> None:
+    """It once reported four blocking issues beside a gate that listed one."""
+    from veritas.reports.next_steps import next_steps
+
+    findings = [make(id=f"A{i}", disposition="artifact") for i in range(4)]
+    steps = next_steps(
+        findings, "REVISE", can_repair=True, accepted={"A1", "A2", "A3"}, blocking={"A0"}
+    )
+    assert "1 blocking issue(s)" in " ".join(s.text for s in steps)
+
+
+def test_missing_archival_files_point_to_scaffold() -> None:
+    from veritas.reports.next_steps import next_steps
+
+    steps = next_steps(
+        [make(id="F", category="check/archival-files", severity="minor")],
+        "REVISE",
+        can_repair=False,
+    )
+    assert any(s.command == "veritas scaffold ." for s in steps)
