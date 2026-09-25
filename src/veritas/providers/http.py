@@ -27,6 +27,10 @@ PERMANENT_429_MARKERS = (
     "billing_hard_limit_reached",
     "no credits remaining",
     "exceeded your current quota",
+    # A single request bigger than the per-minute budget will never fit,
+    # however long we wait: the artifact has to shrink.
+    "request too large",
+    "must be reduced in order to run",
 )
 
 

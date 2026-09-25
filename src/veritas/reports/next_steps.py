@@ -67,10 +67,17 @@ def next_steps(
         unsupplied = [f for f in config if f.category.endswith("/unsupplied")]
         other = [f for f in config if f not in failed and f not in unsupplied]
         if failed:
+            too_large = any(_is_too_large(f) for f in failed)
+            advice = (
+                "Each request is larger than the provider allows per minute, so no wait "
+                "will help: narrow `artifact.paths`, or scope judges with `judge_paths`."
+                if too_large
+                else "Lower `concurrency` if the cause was a rate limit, then re-run."
+            )
             steps.append(
                 Step(
                     f"{len(failed)} judge(s) did not complete; this evaluation is partial. "
-                    "Lower `concurrency` if the cause was a rate limit, then re-run.",
+                    + advice,
                     "veritas evaluate .",
                 )
             )
@@ -125,3 +132,8 @@ def _bounded(steps: list[Step]) -> list[Step]:
         kept.append(step)
         lines += cost
     return kept
+
+
+def _is_too_large(finding: Finding) -> bool:
+    text = finding.description.lower()
+    return "request too large" in text or "must be reduced" in text

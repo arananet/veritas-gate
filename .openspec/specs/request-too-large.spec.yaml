@@ -1,0 +1,42 @@
+---
+title: A request larger than the rate limit is permanent, and says so
+slug: request-too-large
+type: bugfix
+status: review
+author: Claude
+created_at: '2026-09-25'
+updated_at: '2026-09-25'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  A new paper repository evaluated with the default artifact path, the whole
+  repository, sent every judge about 540,000 tokens against a 500,000
+  tokens-per-minute limit. The provider answered 429 "Request too large ... The
+  input or output tokens must be reduced". No wait can make such a request fit,
+  yet Veritas retried each judge three times, then advised lowering
+  concurrency — which cannot help either.
+
+  That 429 is now treated as permanent: it fails at once, and the next step
+  names the real fix, narrowing artifact.paths or judge_paths.
+acceptance_criteria:
+- "Given a 429 whose body says the request is too large or the tokens must be reduced, when it is received, then it is not retried."
+- "Given judge errors caused by an oversized request, when next steps are built, then they say to narrow artifact.paths or judge_paths, not to lower concurrency."
+- "Given judge errors from an ordinary rate limit, when next steps are built, then the concurrency advice is unchanged."
+test_plan:
+- 'Unit test: a request-too-large 429 is permanent; a plain TPM 429 is not.'
+- 'Unit test: next steps for an oversized request name artifact.paths and judge_paths.'
+qa_notes: |
+  Only classification and advice change; nothing about what is sent.
+out_of_scope:
+- Estimating request size before sending.
+- Splitting an artifact across several requests.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - A whole-repository artifact over the TPM limit fails fast and points at artifact.paths.
+  metrics: []
+technical_notes: |
+  Matched on the provider's own wording, like the other permanent 429 markers.

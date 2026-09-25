@@ -198,3 +198,21 @@ def test_without_a_repair_command_the_step_names_the_issues_not_a_dangling_then(
     assert "then:" not in text
     assert "Suite count unsupported" in text
     assert "veritas evaluate ." in text
+
+
+def test_an_oversized_request_is_permanent_and_points_at_artifact_paths() -> None:
+    """540k tokens against a 500k limit was retried three times, then blamed on concurrency."""
+    from veritas.providers.http import _is_permanent
+    from veritas.reports.next_steps import next_steps
+
+    body = (
+        "Request too large for gpt-5.6-luna ... Limit 500000, Requested 540798. "
+        "The input or output tokens must be reduced in order to run successfully."
+    )
+    assert _is_permanent(429, body)
+    assert not _is_permanent(429, "Rate limit reached ... Please try again in 33s.")
+
+    failed = make(id="J", category="judge-error", disposition="configuration", description=body)
+    text = " ".join(s.text for s in next_steps([failed], "FAIL", can_repair=True))
+    assert "artifact.paths" in text and "judge_paths" in text
+    assert "concurrency" not in text
