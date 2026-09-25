@@ -503,6 +503,9 @@ checks:
 execution:
   allow: [pytest]                   # nothing runs unless it is listed here
 
+thesis:                             # optional; what the work sets out to show
+  - "The claim your evidence must support"
+
 judge_paths:                        # optional; narrow what each judge reads
   citations: [paper/manuscript.md]  # unlisted judges read the whole artifact
 

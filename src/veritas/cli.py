@@ -422,7 +422,7 @@ def evaluate(
     if json_output:
         console.print_json(json.dumps(result.model_dump(mode="json")))
     else:
-        reporter.summary(result)
+        reporter.summary(result, can_repair=loaded_config.repair.agent.provider not in ("mock", ""))
         if not quiet:
             console.print(f"[dim]run: {run_dir}[/dim]")
 
@@ -615,7 +615,11 @@ def loop(
     workspace_config.root = workspace.root
 
     try:
-        agent_impl = build_repair_agent(loaded_config.repair, on_output=reporter.agent_output)
+        agent_impl = build_repair_agent(
+            loaded_config.repair,
+            on_output=reporter.agent_output,
+            thesis=loaded_config.thesis,
+        )
     except ConfigError as exc:
         raise _fail(str(exc)) from exc
 

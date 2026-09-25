@@ -12,7 +12,7 @@ from rich.text import Text
 from veritas.models.evaluation import EvaluationResult, GateResult
 from veritas.models.loop import STOP_REASON_TEXT, EvaluationDelta, LoopResult, StopReason
 from veritas.models.repair import RepairPlan, RepairResult
-from veritas.reports.console import GATE_STYLE, SEVERITY_STYLE, STATUS_MARK
+from veritas.reports.console import GATE_STYLE, SEVERITY_STYLE, STATUS_MARK, print_next_steps
 from veritas.reports.spinner import WorkSpinner
 
 STOP_STYLE: dict[StopReason, str] = {
@@ -37,6 +37,7 @@ class LoopReporter:
         self.verbose = verbose
         self._engine_phase: str | None = None
         self._spinner = WorkSpinner(self.console)
+        self._last_evaluation: Any = None
 
     def header(self, profile: str, artifact: str, mode: str, max_iterations: int) -> None:
         if self.quiet:
@@ -127,6 +128,7 @@ class LoopReporter:
         )
 
     def _evaluated(self, payload: dict[str, Any]) -> None:
+        self._last_evaluation = payload.get("result")
         gate: GateResult = payload["gate"]
         self.console.print("Evaluating...")
         self._judge_errors(payload.get("result"))
@@ -275,6 +277,11 @@ class LoopReporter:
                 self._how_to_apply(result)
             else:
                 self.console.print(f"Workspace:\n  {result.workspace}")
+
+        # The loop already repaired what it could; what remains is configuration
+        # or a decision, so the next step is never "run the loop again" here.
+        if self._last_evaluation is not None:
+            print_next_steps(self.console, self._last_evaluation, can_repair=False)
 
     def _how_to_apply(self, result: LoopResult) -> None:
         """Say how to read the repair and how to take it, in full or in part.

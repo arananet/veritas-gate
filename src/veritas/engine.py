@@ -43,6 +43,7 @@ from veritas.models.finding import Finding, max_severity, severity_rank
 from veritas.profiles import JudgeSpec, Profile
 from veritas.providers import ModelProvider, ModelSpec, build_provider
 from veritas.runs import new_run_id
+from veritas.triage import settle
 from veritas.usage import (
     META_JUDGE_LABEL,
     CallUsage,
@@ -172,6 +173,7 @@ class Engine:
             run_id=run_id,
             rubric=self.profile.definition.rubric,
             artifact_type=artifact.type,
+            thesis=list(self.config.thesis),
         )
 
         check_results = [] if self.options.skip_checks else await self._run_checks(artifact)
@@ -189,6 +191,9 @@ class Engine:
             [*check_results, *_claim_findings_as_check(graph)],
         )
         self.options.progress("meta", "meta review", "ok")
+        # Dispositions Veritas knows for certain override whatever a judge said.
+        for item in meta.consolidated:
+            item.finding = settle(item.finding)
 
         judge_errors = [result.judge for result in judge_results if result.status == "error"]
         gate = evaluate_gate(

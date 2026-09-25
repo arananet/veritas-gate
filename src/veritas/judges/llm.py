@@ -18,6 +18,7 @@ from veritas.models.evaluation import JudgeResult, JudgeStatus
 from veritas.models.finding import Finding
 from veritas.providers.base import ModelProvider, ProviderError
 from veritas.security import EVALUATION_RULES, UNTRUSTED_PREAMBLE, wrap_untrusted
+from veritas.triage import TRIAGE_RULES, declared, normalise
 
 NO_EVIDENCE_PENALTY = 0.6
 
@@ -35,6 +36,7 @@ class RawFinding(BaseModel):
     evidence: list[str] = Field(default_factory=list)
     recommendation: str | None = None
     confidence: float = 0.5
+    disposition: str | None = None
 
 
 class RawClaim(BaseModel):
@@ -90,6 +92,7 @@ class LLMJudge:
         parts = [
             UNTRUSTED_PREAMBLE,
             EVALUATION_RULES,
+            TRIAGE_RULES,
             self.prompt.strip(),
             (
                 f"Profile: {context.profile} (version {context.profile_version}). "
@@ -98,6 +101,8 @@ class LLMJudge:
         ]
         if context.rubric:
             parts.append(f"Rubric (authoritative, from the profile): {context.rubric}")
+        if context.thesis:
+            parts.append(thesis_section(context.thesis))
         return "\n\n".join(part for part in parts if part.strip())
 
     def user_prompt(self, artifact: Artifact) -> str:
@@ -159,7 +164,9 @@ class LLMJudge:
                 recommendation=raw.recommendation,
                 confidence=max(0.0, min(1.0, raw.confidence)),
                 source=self.name,
+                disposition=normalise(raw.disposition),
             )
+            finding = declared(finding)
             # Evidence-first: an unevidenced finding survives but carries less weight.
             if not finding.has_evidence:
                 finding = finding.discounted(NO_EVIDENCE_PENALTY)
@@ -232,3 +239,20 @@ def _model_id(provider: ModelProvider | None) -> str | None:
     spec = getattr(provider, "spec", None)
     model = getattr(spec, "model", None)
     return model if isinstance(model, str) and model else None
+
+
+def thesis_section(thesis: list[str]) -> str:
+    """The author's intended claims: to be evaluated, never assumed.
+
+    Stated so a declared thesis cannot bias a judge towards it. What it changes
+    is the recommendation: bound a claim to its evidence rather than delete it.
+    """
+    lines = "\n".join(f"  - {item}" for item in thesis)
+    return (
+        "AUTHOR'S INTENDED CLAIMS (evaluate them like any other claim; they are not "
+        "established by being listed here):\n"
+        f"{lines}\n"
+        "Where the evidence does not support one of these as written, report it, and "
+        "recommend the narrowest wording the evidence does support. Recommend removal "
+        "only when no version of the claim is supported."
+    )

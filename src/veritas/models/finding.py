@@ -35,6 +35,9 @@ def max_severity(severities: list[str]) -> Severity:
     return worst  # type: ignore[return-value]
 
 
+Disposition = Literal["artifact", "configuration", "decision", "declared"]
+
+
 class Finding(BaseModel):
     """A single machine-readable problem observed in an artifact."""
 
@@ -50,6 +53,12 @@ class Finding(BaseModel):
     recommendation: str | None = None
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
     source: str | None = None
+    # Who acts on this: change the work, change veritas.yaml, the author decides,
+    # or it is a limitation the work already declares. Defaults to the work, so
+    # runs recorded before triage existed still load.
+    disposition: Disposition = "artifact"
+    # Set when a declared limitation was capped, so the cap is never silent.
+    original_severity: Severity | None = None
 
     @field_validator("evidence", mode="before")
     @classmethod

@@ -1,0 +1,89 @@
+---
+title: Triage findings, respect declared limitations, protect the thesis, say what to do next
+slug: self-sufficient-triage
+type: feature
+status: review
+author: Claude
+created_at: '2026-09-25'
+updated_at: '2026-09-25'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  Evaluating a real paper needed a person between Veritas and its operator for
+  four jobs Veritas should do itself.
+
+  Limitations the paper already declared came back, every round, as major
+  defects: a confound stated in the paper's own threats section, a single write
+  order named in its research question. The number of majors stopped falling and
+  the gate could never pass on an honest configuration-level study.
+
+  Every finding arrived in one flat list, and someone had to say, each time,
+  which were fixed in the paper, which in veritas.yaml, which were the author's
+  decision, and which were already acknowledged.
+
+  Nothing said what to do next; someone had to, with the commands.
+
+  And nothing told the repair agent or the judges what the work set out to show,
+  so repairs were written by hand to say "narrow this claim, do not delete it".
+
+  Four changes answer them.
+
+  Declared limitations. Judges are told to read the artifact's own limitations
+  before reporting. A finding the artifact explicitly acknowledges is marked
+  `declared`, must quote the acknowledging passage, and is capped at minor.
+  A critical finding is never capped: acknowledging a fabricated result does
+  not make it acceptable.
+
+  Triage. Every finding carries a disposition — `artifact` (change the work),
+  `configuration` (change veritas.yaml), `decision` (the author must choose),
+  `declared` (already acknowledged). Judges propose it; deterministic rules
+  settle the cases Veritas knows better than any judge, such as an unsupplied
+  path or a failed judge.
+
+  Next steps. Evaluate and loop end with a short block, grouped by disposition,
+  with the command for each group, and no more than a handful of lines.
+
+  Thesis. `thesis:` in veritas.yaml lists the claims the work sets out to
+  demonstrate. Judges receive it as the author's intended claims, to be evaluated
+  like any other, with the instruction to recommend the narrowest supported
+  wording rather than removal. The repair agent receives it as claims to
+  preserve and bound, never delete.
+acceptance_criteria:
+- "Given a judge finding marked declared with evidence quoting the artifact, when it is recorded, then its severity is at most minor and the original severity is kept in metadata."
+- "Given a finding marked declared with no evidence, when it is recorded, then it is not capped and its disposition is treated as artifact."
+- "Given a critical finding marked declared, when it is recorded, then it stays critical."
+- "Given a cited path that exists but is not supplied, when it is triaged, then its disposition is configuration regardless of what a judge proposed."
+- "Given a failed judge, when it is triaged, then its disposition is configuration."
+- "Given a judge-proposed disposition outside the four values, when it is recorded, then it falls back to artifact."
+- "Given an evaluation, when the console summary is printed, then findings are counted by disposition and a next-steps block of at most eight lines follows, naming the command for each non-empty group."
+- "Given a loop that stops, when its summary is printed, then the same next-steps block follows."
+- "Given thesis entries in veritas.yaml, when a judge runs, then its system prompt lists them as the author's intended claims with the bounding instruction."
+- "Given thesis entries, when a repair prompt is rendered, then it lists them as claims to preserve and bound, never delete."
+- "Given no thesis, when prompts are built, then no thesis section appears."
+test_plan:
+- 'Unit test: declared with evidence is capped at minor and records the original severity.'
+- 'Unit test: declared without evidence is neither capped nor kept as declared.'
+- 'Unit test: critical declared stays critical.'
+- 'Unit test: unsupplied-path and judge-error findings are configuration.'
+- 'Unit test: an unknown disposition falls back to artifact.'
+- 'Unit test: the next-steps block groups by disposition, names commands, and is bounded.'
+- 'Unit test: the thesis appears in the judge system prompt and the repair prompt, and is absent when unset.'
+qa_notes: |
+  The cap is conditional on quoted evidence so a judge cannot quietly launder a
+  defect by calling it declared. The thesis is framed to judges as claims to
+  evaluate, not facts to accept, so declaring one cannot bias a judge towards it.
+out_of_scope:
+- Automatically accepting declared findings as known risks; they are minor, and remain visible.
+- Choosing disposition by a second model call.
+- Rewriting the thesis or inferring it from the artifact.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - A paper whose threats section declares its main confound is not held at REVISE by that confound alone.
+  metrics: []
+technical_notes: |
+  Disposition is a field on Finding with a default, so runs recorded before this
+  change still load.

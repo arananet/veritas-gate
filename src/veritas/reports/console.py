@@ -9,6 +9,7 @@ from rich.text import Text
 
 from veritas.models.evaluation import EvaluationResult, GateResult
 from veritas.models.finding import Finding, issue_key, severity_rank
+from veritas.reports.next_steps import next_steps
 from veritas.reports.spinner import WorkSpinner
 from veritas.usage import UsageSummary
 
@@ -122,7 +123,7 @@ class ConsoleReporter:
         mark, style = STATUS_MARK.get(status, ("  ", ""))
         self._spinner.mark_done(name, f"  [{style}]{mark}[/{style}]{name}")
 
-    def summary(self, result: EvaluationResult) -> None:
+    def summary(self, result: EvaluationResult, *, can_repair: bool = False) -> None:
         self._spinner.stop()
         if self.quiet:
             self.console.print(result.gate.status)
@@ -135,6 +136,7 @@ class ConsoleReporter:
         self._usage(result)
         self._blocking(result)
         self._gate(result.gate)
+        print_next_steps(self.console, result, can_repair=can_repair)
 
     def _judge_errors(self, result: EvaluationResult) -> None:
         """Say why a judge failed. A silent ✗ hid broken credentials as a pass."""
@@ -348,3 +350,16 @@ def _money(value: float | None, currency: str | None) -> str:
     unit = f" {currency}" if currency and currency != "USD" else ""
     prefix = "$" if not unit else ""
     return f"{prefix}{value:,.4f}{unit}"
+
+
+def print_next_steps(console: Console, result: EvaluationResult, *, can_repair: bool) -> None:
+    """Say what to do next, grouped by who acts, in a handful of lines."""
+    steps = next_steps(result.meta_review.findings, result.gate.status, can_repair=can_repair)
+    if not steps:
+        return
+    console.print()
+    console.print("[bold]Next steps[/bold]")
+    for index, step in enumerate(steps, start=1):
+        console.print(f"  {index}. {step.text}")
+        if step.command:
+            console.print(f"     [cyan]{step.command}[/cyan]", soft_wrap=True)

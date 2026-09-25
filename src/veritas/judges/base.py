@@ -24,6 +24,7 @@ class EvaluationContext:
     rubric: dict[str, Any] = field(default_factory=dict)
     artifact_type: str = "document"
     notes: dict[str, Any] = field(default_factory=dict)
+    thesis: list[str] = field(default_factory=list)
 
 
 @runtime_checkable
