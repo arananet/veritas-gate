@@ -55,6 +55,12 @@ judges:
     version: "1"
     description: Whether the work can be found, cited and retrieved, and whether what it cites will hold.
 
+  - name: presentation
+    prompt: presentation.md
+    model_role: presentation
+    version: "1"
+    description: Structure, figures and tables, captions, and whether the paper reads as reviewed work.
+
   - name: adversarial
     prompt: adversarial.md
     model_role: adversarial
@@ -127,6 +133,15 @@ checks:
   # archive DOIs with CITATION.cff.
   frozen-integrity:
     type: frozen-integrity
+    enabled: true
+    severity_on_failure: major
+
+  # What a reader sees first: process narration left in the paper (review
+  # pending, tool failures, test tallies, session notes), long hashes repeated,
+  # a multi-paragraph abstract, figures never cited, a paper with no figure.
+  # Set target to the manuscript to enable it.
+  presentation:
+    type: presentation
     enabled: true
     severity_on_failure: major
 

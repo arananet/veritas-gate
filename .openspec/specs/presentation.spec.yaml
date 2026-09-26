@@ -1,0 +1,37 @@
+---
+title: Presentation check and presentation judge
+slug: presentation
+type: feature
+status: review
+author: Claude
+created_at: '2026-09-26'
+updated_at: '2026-09-26'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  An agent-revised manuscript kept its revision log in the paper: review
+  pending, session notes, tool failures, a commit hash six times, a
+  two-paragraph abstract. The presentation check reports these patterns
+  deterministically, plus figures never cited and a paper with no figure.
+  A presentation judge evaluates structure, figures, captions, tables and
+  whether the paper reads as reviewed work, recommending figures drawn only
+  from existing evidence.
+acceptance_criteria:
+- "Given process narration, when the check runs, then one finding lists each line at severity_on_failure."
+- "Given a hash repeated three or more times in prose, when the check runs, then it is reported; hashes inside URLs are not counted."
+- "Given a multi-paragraph or over-long abstract, when the check runs, then it is reported."
+- "Given a figure never cited, or no figure at all, when the check runs, then it is reported; require_figures false disables the latter."
+- "Given the scientific-paper profile, when judges load, then a presentation judge with its prompt exists."
+test_plan:
+- 'tests/test_check_presentation.py and tests/test_config.py.'
+qa_notes: 'Validated on a real manuscript: the pre-revision version fails on exactly the issues found by hand; the revised one passes.'
+out_of_scope: []
+implementation_skill:
+eval_plan:
+  scenarios:
+  - A manuscript with process narration fails; its revised version passes.
+  metrics: []
+technical_notes: ''

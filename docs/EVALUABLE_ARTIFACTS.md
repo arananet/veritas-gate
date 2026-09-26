@@ -103,6 +103,25 @@ A claim resting only on them is reported as unverified (minor, declared), not
 as missing evidence. `veritas files` shows how many files are withheld. A path
 both in `paths` and `withheld` is supplied.
 
+## Present it like reviewed work
+
+Set the presentation check's target to your manuscript:
+
+```yaml
+checks:
+  presentation:
+    target: paper/manuscript.md
+```
+
+It reports, for nothing: process narration left in the paper ("review
+pending", tool failures, test tallies, session notes), long hashes repeated in
+prose, a multi-paragraph or over-long abstract, figures the text never cites,
+and a paper with no figure. The presentation judge then weighs what needs
+judgement: whether the main result is visible early, contributions and
+research questions are explicit, captions stand alone (takeaway, metric, n,
+what the error bars are), and where a figure would show a pattern better than
+a table, drawn from evidence you already have.
+
 ## Declare what you generate
 
 Figures, tables and the LaTeX are generated from something. Declare it, and a

@@ -8,6 +8,7 @@ from veritas.checks.command import CommandCheck, CommandNotAllowedError
 from veritas.checks.derived import DerivedFreshnessCheck
 from veritas.checks.integrity import FrozenIntegrityCheck
 from veritas.checks.numbers import NumericTraceabilityCheck
+from veritas.checks.presentation import PresentationCheck
 from veritas.checks.references import ReferenceIntegrityCheck
 from veritas.checks.structure import (
     ContentPatternsCheck,
@@ -26,6 +27,7 @@ CHECK_TYPES = (
     "numeric-traceability",
     "derived-freshness",
     "frozen-integrity",
+    "presentation",
 )
 
 __all__ = [
@@ -70,6 +72,8 @@ def build_check(
         return DerivedFreshnessCheck(name, config, list(derived or []))
     if config.type == "frozen-integrity":
         return FrozenIntegrityCheck(name, config, list(frozen or []))
+    if config.type == "presentation":
+        return PresentationCheck(name, config)
     raise ConfigError(
         f"check '{name}' has unknown type '{config.type}'; known types: {', '.join(CHECK_TYPES)}"
     )

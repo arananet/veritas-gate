@@ -71,6 +71,7 @@ def test_scientific_paper_profile_defines_its_judges(repo_root: Path) -> None:
         "repo-consistency",
         "citations",
         "archival",
+        "presentation",
         "adversarial",
     ]
     for spec in profile.definition.judges:
