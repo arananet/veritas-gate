@@ -1,0 +1,36 @@
+---
+title: A figures judge reviews rendered figure pages
+slug: visual-judge
+type: feature
+status: review
+author: Claude
+created_at: '2026-09-26'
+updated_at: '2026-09-26'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  Text judges see a figure's filename, not the figure. Providers now accept
+  PNG images (Anthropic, OpenAI, Google formats). A judge marked `visual`
+  renders the pages of artifact.pdf that carry a figure caption and sends
+  them with their text to a vision-capable model, reviewing labels, units,
+  uncertainty, honesty of axes, accessibility, captions and consistency with
+  the text. Without artifact.pdf the judge is skipped.
+acceptance_criteria:
+- "Given a PDF, when figure pages are sought, then pages with a Figure caption are returned."
+- "Given the judge runs, when the request is sent, then it carries one PNG per figure page and the page text, and findings are parsed."
+- "Given a missing PDF, when the judge runs, then it returns a judge error, not a verdict."
+- "Given providers, when images are passed, then each uses its API's image format; without images the request is unchanged."
+- "Given no artifact.pdf, when judges are built, then the visual judge is skipped."
+test_plan:
+- 'tests/test_visual_judge.py; PDF tests skip without pdflatex and poppler.'
+qa_notes: 'Validated on a real paper: figure pages 4 and 7 found and rendered.'
+out_of_scope:
+- Judging figures that are not captioned.
+implementation_skill:
+eval_plan:
+  scenarios: []
+  metrics: []
+technical_notes: 'At most 8 pages at 110 dpi per evaluation.'

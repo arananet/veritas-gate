@@ -378,6 +378,8 @@ class ArtifactConfig(BaseModel):
 
     type: str = "document"
     paths: list[str] = Field(default_factory=list)
+    # The built PDF, for judges that review rendered pages (figures).
+    pdf: str | None = None
     # Per-file character cap on what reaches a judge. Raise it for a long
     # manuscript; lower it only to control cost on a large tree.
     max_file_chars: int = 400_000

@@ -6,6 +6,7 @@ supported way to constrain Anthropic responses to a JSON schema.
 
 from __future__ import annotations
 
+import base64
 import json
 from typing import Any
 
@@ -37,6 +38,7 @@ class AnthropicProvider:
         system_prompt: str,
         user_prompt: str,
         schema: type[SchemaT],
+        images: list[bytes] | None = None,
     ) -> StructuredResponse:
         base = (self.spec.base_url or DEFAULT_BASE_URL).rstrip("/")
         headers = {
@@ -48,7 +50,7 @@ class AnthropicProvider:
             "model": self.spec.model,
             "max_tokens": self.spec.max_tokens,
             "system": system_prompt,
-            "messages": [{"role": "user", "content": user_prompt}],
+            "messages": [{"role": "user", "content": _content(user_prompt, images)}],
             "tools": [
                 {
                     "name": TOOL_NAME,
@@ -95,3 +97,22 @@ def _usage(body: dict[str, Any]) -> dict[str, Any]:
         "model": body.get("model"),
         "stop_reason": body.get("stop_reason"),
     }
+
+
+def _content(text: str, images: list[bytes] | None) -> Any:
+    """Plain text, or image blocks (PNG) followed by the text."""
+    if not images:
+        return text
+    blocks: list[dict[str, Any]] = [
+        {
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": "image/png",
+                "data": base64.b64encode(image).decode("ascii"),
+            },
+        }
+        for image in images
+    ]
+    blocks.append({"type": "text", "text": text})
+    return blocks

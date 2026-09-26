@@ -61,6 +61,13 @@ judges:
     version: "1"
     description: Structure, figures and tables, captions, and whether the paper reads as reviewed work.
 
+  - name: figures
+    prompt: figures.md
+    model_role: figures
+    visual: true
+    version: "1"
+    description: Looks at the rendered figures (needs artifact.pdf and a vision-capable model).
+
   - name: adversarial
     prompt: adversarial.md
     model_role: adversarial

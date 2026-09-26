@@ -142,6 +142,23 @@ class Engine:
         judges: list[LLMJudge] = []
         for spec in self.judge_specs():
             role = spec.model_role or spec.name
+            if spec.visual:
+                # Without a built PDF there is nothing to look at: skip, not fail.
+                if not self.config.artifact.pdf:
+                    continue
+                from veritas.judges.visual import VisualJudge
+
+                judges.append(
+                    VisualJudge(
+                        name=spec.name,
+                        prompt=self.profile.prompt_for(spec),
+                        provider=self.provider_for(role),
+                        version=spec.version,
+                        model_role=role,
+                        pdf=self.config.root / self.config.artifact.pdf,
+                    )
+                )
+                continue
             judges.append(
                 LLMJudge(
                     name=spec.name,

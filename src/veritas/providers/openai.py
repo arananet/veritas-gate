@@ -8,6 +8,7 @@ uses ``response_format: json_schema`` where supported and falls back to
 
 from __future__ import annotations
 
+import base64
 from typing import Any
 
 from veritas.providers.base import (
@@ -42,6 +43,7 @@ class OpenAIProvider:
         system_prompt: str,
         user_prompt: str,
         schema: type[SchemaT],
+        images: list[bytes] | None = None,
     ) -> StructuredResponse:
         base = (self.spec.base_url or DEFAULT_BASE_URL).rstrip("/")
         headers = {
@@ -53,7 +55,7 @@ class OpenAIProvider:
             self.token_field: self.spec.max_tokens,
             "messages": [
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
+                {"role": "user", "content": _content(user_prompt, images)},
             ],
             "response_format": {
                 "type": "json_schema",
@@ -157,3 +159,16 @@ def _usage(body: dict[str, Any]) -> dict[str, Any]:
         "total_tokens": usage.get("total_tokens"),
         "model": body.get("model"),
     }
+
+
+def _content(text: str, images: list[bytes] | None) -> Any:
+    """Plain text, or the text followed by PNG images as data URLs."""
+    if not images:
+        return text
+    parts: list[dict[str, Any]] = [{"type": "text", "text": text}]
+    for image in images:
+        encoded = base64.b64encode(image).decode("ascii")
+        parts.append(
+            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{encoded}"}}
+        )
+    return parts

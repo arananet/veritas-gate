@@ -149,7 +149,9 @@ class LLMJudge:
             )
         except ProviderError as exc:
             return error_result(self.name, str(exc))
+        return self._result_from(response)
 
+    def _result_from(self, response: Any, extra: dict[str, Any] | None = None) -> JudgeResult:
         payload = response.value
         assert isinstance(payload, JudgeResponse)
         findings = self._build_findings(payload)
@@ -167,6 +169,7 @@ class LLMJudge:
                 "model": _model_id(self.provider),
                 "provider": getattr(self.provider, "name", "unknown"),
                 "usage": response.usage,
+                **(extra or {}),
             },
         )
 

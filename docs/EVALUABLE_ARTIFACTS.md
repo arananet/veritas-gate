@@ -133,6 +133,25 @@ replaced in text, then re-scanned. A binary that still contains a term (a
 screenshot archive, say) is listed and the command fails, so it is never
 uploaded unseen.
 
+## Let a judge look at the figures
+
+Name the built PDF and the figures judge reviews the rendered pages that
+carry a figure caption, using a vision-capable model:
+
+```yaml
+artifact:
+  pdf: paper/main.pdf
+models:
+  figures:            # any vision-capable model; defaults to `default`
+    provider: anthropic
+    model: <a vision-capable model>
+```
+
+It checks axis labels and units, n and what error bars mean, truncated axes,
+legibility in grey and for colour-blind readers, captions that stand alone,
+and whether each figure shows what the text says. Without `artifact.pdf` the
+judge is skipped. It needs poppler-utils (pdftotext, pdftoppm).
+
 ## Present it like reviewed work
 
 Set the presentation check's target to your manuscript:

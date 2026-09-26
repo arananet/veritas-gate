@@ -6,6 +6,7 @@ Structured output uses ``responseMimeType: application/json`` together with a
 
 from __future__ import annotations
 
+import base64
 from typing import Any
 
 from veritas.providers.base import (
@@ -46,13 +47,14 @@ class GoogleProvider:
         system_prompt: str,
         user_prompt: str,
         schema: type[SchemaT],
+        images: list[bytes] | None = None,
     ) -> StructuredResponse:
         base = (self.spec.base_url or DEFAULT_BASE_URL).rstrip("/")
         api_key = require_api_key(self.spec, "GOOGLE_API_KEY")
         headers = {"content-type": "application/json", "x-goog-api-key": api_key}
         payload: dict[str, Any] = {
             "systemInstruction": {"parts": [{"text": system_prompt}]},
-            "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
+            "contents": [{"role": "user", "parts": _parts(user_prompt, images)}],
             "generationConfig": {
                 "maxOutputTokens": self.spec.max_tokens,
                 "responseMimeType": "application/json",
@@ -119,3 +121,13 @@ def _usage(body: dict[str, Any]) -> dict[str, Any]:
         "total_tokens": usage.get("totalTokenCount"),
         "model": body.get("modelVersion"),
     }
+
+
+def _parts(text: str, images: list[bytes] | None) -> list[dict[str, Any]]:
+    """Inline PNG images, then the text."""
+    parts: list[dict[str, Any]] = [
+        {"inlineData": {"mimeType": "image/png", "data": base64.b64encode(image).decode("ascii")}}
+        for image in images or []
+    ]
+    parts.append({"text": text})
+    return parts

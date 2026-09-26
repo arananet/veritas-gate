@@ -42,6 +42,8 @@ class JudgeSpec(BaseModel):
     version: str = "1"
     enabled: bool = True
     extracts_claims: bool = False
+    # A visual judge reviews rendered pages of artifact.pdf instead of text.
+    visual: bool = False
     description: str = ""
 
 

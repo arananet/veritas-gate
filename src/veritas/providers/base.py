@@ -60,6 +60,7 @@ class ModelProvider(Protocol):
         system_prompt: str,
         user_prompt: str,
         schema: type[SchemaT],
+        images: list[bytes] | None = None,
     ) -> StructuredResponse: ...
 
 
