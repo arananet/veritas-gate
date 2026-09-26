@@ -309,3 +309,16 @@ def test_an_unknown_judge_in_judge_paths_is_rejected(tmp_path: Path, repo_root: 
     engine = Engine(config, load_profile("generic-document", repo_root))
     with pytest.raises(ConfigError, match="nonexistent"):
         engine._scoped_artifacts(_two_file_artifact(tmp_path), engine.build_judges())
+
+
+def test_a_scoped_latex_file_brings_its_inputs(tmp_path: Path, repo_root: Path) -> None:
+    (tmp_path / "main.tex").write_text("\\input{table}\n", encoding="utf-8")
+    (tmp_path / "table.tex").write_text("rows\n", encoding="utf-8")
+    (tmp_path / "doc.md").write_text("# d\n", encoding="utf-8")
+    config = config_for(
+        tmp_path, "http://127.0.0.1:9", repo_root, judge_paths={"structure": ["main.tex"]}
+    )
+    engine = Engine(config, load_profile("generic-document", repo_root))
+    artifact = Artifact(id="a", type="document", root=tmp_path, paths=["main.tex", "doc.md"])
+    scoped = engine._scoped_artifacts(artifact, engine.build_judges())
+    assert {s.path for s in scoped["structure"].segments()} == {"main.tex", "table.tex"}

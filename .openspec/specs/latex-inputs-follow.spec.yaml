@@ -1,0 +1,37 @@
+---
+title: A supplied LaTeX file brings the files it inputs
+slug: latex-inputs-follow
+type: bugfix
+status: review
+author: Claude
+created_at: '2026-09-26'
+updated_at: '2026-09-26'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  A manuscript's results table was a generated file pulled in with \input.
+  Listed only as main.tex, it reached no judge, and five judges reported the
+  table missing across two evaluations. Files a supplied .tex inputs
+  (\input, \include, \subfile, \bibliography) are now read with it, when they
+  exist inside the artifact root, and follow it into any judge_paths scope.
+acceptance_criteria:
+- "Given a supplied main.tex that inputs table.tex, when the artifact is read, then table.tex is supplied too."
+- "Given nested inputs, when resolved, then the including file's folder and its ancestors are tried, as LaTeX resolves from the main file's directory."
+- "Given a commented-out \\input, when the artifact is read, then it is ignored."
+- "Given judge_paths naming main.tex, when a judge is scoped, then it also receives main.tex's inputs."
+test_plan:
+- 'tests/test_artifacts.py and tests/test_engine.py cover each criterion.'
+qa_notes: |
+  Only files inside the artifact root are followed.
+out_of_scope:
+- Macros that compute file names.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - A paper listing only main.tex is judged with its generated tables.
+  metrics: []
+technical_notes: |
+  Shallow regex over uncommented lines, like the arxiv-package check.

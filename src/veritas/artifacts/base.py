@@ -8,6 +8,7 @@ only collects addressable text segments that judges and checks can cite.
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
@@ -119,6 +120,7 @@ class Artifact:
                 segment = _read_file(self.root, target)
                 if segment is not None:
                     collected.append(segment)
+        collected.extend(_latex_dependencies(self.root, collected))
         seen: set[str] = set()
         unique: list[ArtifactSegment] = []
         for segment in collected:
@@ -170,6 +172,61 @@ class Artifact:
         if result.returncode != 0:
             return None
         return result.stdout.strip() or None
+
+
+_LATEX_INCLUDE = re.compile(r"\\(?:input|include|subfile|bibliography)\s*\{([^}]+)\}")
+
+
+def latex_includes(segment: ArtifactSegment) -> list[str]:
+    """Paths, relative to the root, that a LaTeX segment pulls in."""
+    if not segment.path.endswith(".tex"):
+        return []
+    folder = PurePosixPath(segment.path).parent
+    found: list[str] = []
+    for line in segment.text.splitlines():
+        line = re.split(r"(?<!\\)%", line, maxsplit=1)[0]
+        for group in _LATEX_INCLUDE.findall(line):
+            for name in group.split(","):
+                name = name.strip()
+                if not name:
+                    continue
+                candidates = (
+                    [name] if PurePosixPath(name).suffix else [f"{name}.tex", f"{name}.bib"]
+                )
+                # LaTeX resolves from the main file's directory, which a nested
+                # file does not know; its own folder and each ancestor are tried.
+                for base in (folder, *folder.parents):
+                    found.extend(str(base / candidate) for candidate in candidates)
+    return found
+
+
+def _latex_dependencies(root: Path, segments: list[ArtifactSegment]) -> list[ArtifactSegment]:
+    """Files a supplied LaTeX document inputs, read even when not listed.
+
+    A manuscript is its main file plus everything it inputs. Listing the main
+    file alone once sent eight judges a paper whose results table -- a
+    generated \\input -- was absent, and five of them reported it missing.
+    Only files inside the artifact root are followed.
+    """
+    have = {segment.path for segment in segments}
+    pending = list(segments)
+    added: list[ArtifactSegment] = []
+    resolved_root = root.resolve()
+    while pending:
+        segment = pending.pop()
+        for rel in latex_includes(segment):
+            if rel in have:
+                continue
+            target = (root / rel).resolve()
+            if not target.is_file() or not _within(target, resolved_root):
+                continue
+            loaded = _read_file(root, target)
+            if loaded is None:
+                continue
+            have.add(loaded.path)
+            added.append(loaded)
+            pending.append(loaded)
+    return added
 
 
 def _read_file(root: Path, target: Path) -> ArtifactSegment | None:

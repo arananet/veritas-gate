@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from veritas import __version__
-from veritas.artifacts.base import Artifact
+from veritas.artifacts.base import Artifact, latex_includes
 from veritas.checks import build_check
 from veritas.claims import build_graph, claim_findings
 from veritas.claims.graph import ClaimGraph
@@ -324,6 +324,16 @@ class Engine:
                     for prefix in prefixes
                 )
             ]
+            # A scoped LaTeX file brings what it inputs: a judge given the
+            # manuscript must not be denied its tables and bibliography.
+            by_path = {segment.path: segment for segment in segments}
+            pending = list(kept)
+            while pending:
+                for rel in latex_includes(pending.pop()):
+                    extra = by_path.get(rel)
+                    if extra is not None and extra not in kept:
+                        kept.append(extra)
+                        pending.append(extra)
             scoped[judge.name] = replace(artifact, _segments=kept)
         return scoped
 

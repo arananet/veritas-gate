@@ -94,3 +94,30 @@ def test_formats_research_repositories_use_are_read(tmp_path: Path) -> None:
     listed = set(artifact.file_list())
     assert set(names) <= listed
     assert "image.png" not in listed
+
+
+def test_latex_inputs_follow_the_main_file(tmp_path: Path) -> None:
+    """A manuscript is its main file plus what it inputs."""
+    paper = tmp_path / "paper"
+    paper.mkdir()
+    (paper / "main.tex").write_text(
+        "\\input{table.tex}\n\\input{sections/intro}\n% \\input{commented}\n\\bibliography{refs}\n",
+        encoding="utf-8",
+    )
+    (paper / "table.tex").write_text("a & b\n", encoding="utf-8")
+    (paper / "sections").mkdir()
+    (paper / "sections" / "intro.tex").write_text("\\input{deep}\n", encoding="utf-8")
+    (paper / "deep.tex").write_text("deep\n", encoding="utf-8")
+    (paper / "commented.tex").write_text("no\n", encoding="utf-8")
+    (paper / "refs.bib").write_text("@misc{a, title={t}}\n", encoding="utf-8")
+    artifact = Artifact(id="a", type="paper", root=tmp_path, paths=["paper/main.tex"])
+    files = set(artifact.file_list())
+    assert {
+        "paper/main.tex",
+        "paper/table.tex",
+        "paper/sections/intro.tex",
+        "paper/refs.bib",
+    } <= files
+    # Relative to the file that inputs it, as LaTeX resolves from the main file's
+    # directory only when run there: intro's \input{deep} resolves beside intro.
+    assert "paper/commented.tex" not in files
