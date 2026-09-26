@@ -352,6 +352,11 @@ class LoopConfig(BaseModel):
     #             where halting at the first human decision is the point.
     # Neither mode ever dispatches a human-blocked action to a repair agent.
     on_human_decision: Literal["defer", "stop"] = "defer"
+    # Before each repair, run the repair agent once in read-only mode to
+    # establish facts from the evidence (counts, ratios, git history) with
+    # their sources. Any file it changes is reverted. The facts are given to
+    # the repair, so it corrects from data instead of reporting "missing".
+    investigate: bool = True
     max_cost_usd: float | None = None
     max_changed_files: int | None = 25
 

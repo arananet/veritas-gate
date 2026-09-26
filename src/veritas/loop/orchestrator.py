@@ -251,6 +251,16 @@ class LoopOrchestrator:
                 break
 
             # ------------------------------------------------------ REPAIR
+            investigate = getattr(self.agent, "investigate", None)
+            if self.config.investigate and investigate is not None:
+                self.options.progress("investigating", {"iteration": iteration})
+                investigation = await investigate(plan, workspace)
+                self.store.write_json(iteration_dir, "investigation.json", investigation)
+                self.agent.facts = investigation.facts  # type: ignore[attr-defined]
+                self.options.progress(
+                    "investigated", {"iteration": iteration, "investigation": investigation}
+                )
+
             self.phase = Phase.REPAIR
             self.options.progress("repairing", {"iteration": iteration, "plan": plan})
             before = workspace.snapshot()

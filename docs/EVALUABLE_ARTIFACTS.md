@@ -133,6 +133,18 @@ replaced in text, then re-scanned. A binary that still contains a term (a
 screenshot archive, say) is listed and the command fails, so it is never
 uploaded unseen.
 
+## Investigate before repairing
+
+Before each repair, `veritas loop` runs the repair agent once more in
+read-only mode (`loop.investigate`, on by default). It establishes the facts
+the repair depends on from the repository itself: counts over the evidence
+files, totals and ratios computed with read-only commands, and `git log` /
+`git show` for history. Each fact must name its source; one without a source
+is dropped, and anything the investigator changes is reverted. The facts are
+saved as `investigation.json` in the iteration and given to the repair as
+"Verified facts", so a denominator that does not add up is corrected from the
+data rather than reported as missing evidence.
+
 ## Let a judge look at the figures
 
 Name the built PDF and the figures judge reviews the rendered pages that

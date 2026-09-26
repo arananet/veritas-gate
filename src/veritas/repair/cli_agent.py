@@ -44,6 +44,7 @@ from pathlib import Path
 from typing import Any
 
 from veritas.artifacts.base import Artifact
+from veritas.models.investigation import Fact, Investigation
 from veritas.models.repair import AppliedChange, RepairPlan, RepairResult
 from veritas.repair.base import enforce_permissions
 from veritas.repair.permissions import RepairAgentConfig, RepairPermissions
@@ -69,6 +70,8 @@ class GenericCLIRepairAgent:
         frozen: list[str] | None = None,
     ) -> None:
         self.frozen = list(frozen or [])
+        # Facts a read-only investigation established for the current plan.
+        self.facts: list[Fact] = []
         self.config = config
         self.permissions = permissions or RepairPermissions()
         self.prompt_template = prompt if prompt is not None else load_repair_prompt()
@@ -106,33 +109,9 @@ class GenericCLIRepairAgent:
         ]
         before = workspace.snapshot()
 
-        lines: list[str] = []
-        try:
-            process = await asyncio.create_subprocess_exec(
-                *command,
-                cwd=str(workspace.root),
-                env=self._environment(),
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-            )
-        except (OSError, ValueError) as exc:
-            return _failed(plan, f"the repair command could not be started: {exc}")
-
-        try:
-            # Read line by line rather than waiting for the process to exit: a
-            # repair runs for minutes, and a spinner alone cannot be told apart
-            # from a hang. Nothing here parses the output -- it belongs to
-            # whichever CLI agent is configured.
-            await asyncio.wait_for(self._stream(process, lines), timeout=self.config.timeout)
-            returncode = process.returncode or 0
-        except TimeoutError:
-            process.kill()
-            return _failed(
-                plan,
-                f"the repair command timed out after {self.config.timeout:.0f}s",
-                output="\n".join(lines)[-OUTPUT_LIMIT:],
-            )
-        output = "\n".join(lines)[-OUTPUT_LIMIT:]
+        returncode, output, error = await self._execute(command, workspace)
+        if error:
+            return _failed(plan, error, output=output)
 
         changed = workspace.changed_since(before)
         changed = [path for path in changed if not path.startswith(".veritas/")]
@@ -183,6 +162,33 @@ class GenericCLIRepairAgent:
             },
         )
 
+    async def _execute(
+        self, command: list[str], workspace: Workspace
+    ) -> tuple[int, str, str | None]:
+        """Run the agent; return (exit code, output tail, error or None)."""
+        lines: list[str] = []
+        try:
+            process = await asyncio.create_subprocess_exec(
+                *command,
+                cwd=str(workspace.root),
+                env=self._environment(),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+        except (OSError, ValueError) as exc:
+            return 1, "", f"the repair command could not be started: {exc}"
+        try:
+            # Read line by line rather than waiting for the process to exit: a
+            # repair runs for minutes, and a spinner alone cannot be told apart
+            # from a hang. Nothing here parses the output -- it belongs to
+            # whichever CLI agent is configured.
+            await asyncio.wait_for(self._stream(process, lines), timeout=self.config.timeout)
+        except TimeoutError:
+            process.kill()
+            output = "\n".join(lines)[-OUTPUT_LIMIT:]
+            return 1, output, f"the repair command timed out after {self.config.timeout:.0f}s"
+        return process.returncode or 0, "\n".join(lines)[-OUTPUT_LIMIT:], None
+
     async def _stream(self, process: asyncio.subprocess.Process, lines: list[str]) -> None:
         """Collect the agent's output, handing each line to the observer as it lands."""
         assert process.stdout is not None
@@ -218,6 +224,7 @@ class GenericCLIRepairAgent:
             "",
             *self._thesis_lines(),
             *self._frozen_lines(),
+            *self._fact_lines(),
             f"## Repair plan (iteration {plan.iteration})",
             "",
             f"The machine-readable plan is at `{plan_file}`.",
@@ -240,6 +247,107 @@ class GenericCLIRepairAgent:
                 ]
             )
         return "\n".join(sections)
+
+    def _fact_lines(self) -> list[str]:
+        """Facts verified from the repository before this repair, with sources."""
+        if not self.facts:
+            return []
+        return [
+            "## Verified facts (from a read-only investigation of this repository)",
+            "",
+            "Use these instead of guessing or reporting evidence as missing. Each was",
+            "checked against the source it names. Do not contradict them without new",
+            "evidence, and do not state any number that is not here or in the files.",
+            "",
+            *[
+                f"- {fact.statement} (source: {fact.source})"
+                + (f" [{fact.action_id}]" if fact.action_id else "")
+                for fact in self.facts
+            ],
+            "",
+        ]
+
+    async def investigate(self, plan: RepairPlan, workspace: Workspace) -> Investigation:
+        """Run the agent once, read-only, to establish facts for this plan.
+
+        The agent is told not to modify anything. Whatever it changes anyway is
+        reverted here, so an investigation can never alter the artifact, and a
+        fact without a source is dropped.
+        """
+        if not self.config.command:
+            return Investigation(status="skipped", notes=["repair.agent.command is not set"])
+        tmp = workspace.root / ".veritas" / "tmp"
+        tmp.mkdir(parents=True, exist_ok=True)
+        plan_file = tmp / f"investigation-plan-{plan.iteration:03d}.json"
+        prompt_file = tmp / f"investigation-prompt-{plan.iteration:03d}.md"
+        result_file = tmp / f"investigation-{plan.iteration:03d}.json"
+        result_file.unlink(missing_ok=True)
+        plan_file.write_text(
+            json.dumps(plan.model_dump(mode="json"), indent=2) + "\n", encoding="utf-8"
+        )
+        prompt_file.write_text(self.investigation_prompt(plan, result_file), encoding="utf-8")
+        command = [
+            _template(part, plan_file, prompt_file, result_file, workspace)
+            for part in self.config.command
+        ]
+        before = workspace.snapshot()
+        returncode, output, error = await self._execute(command, workspace)
+        changed = [p for p in workspace.changed_since(before) if not p.startswith(".veritas/")]
+        reverted = workspace.restore(changed) if changed else []
+        if error:
+            return Investigation(status="failed", notes=[error], reverted=reverted)
+        try:
+            investigation = Investigation.model_validate_json(
+                result_file.read_text(encoding="utf-8")
+            )
+        except (OSError, ValueError):
+            return Investigation(
+                status="failed",
+                reverted=reverted,
+                notes=[f"the investigator wrote no readable result (exit {returncode})"],
+            )
+        investigation.facts = investigation.verified_facts()
+        investigation.reverted = reverted
+        if reverted:
+            investigation.notes.append(
+                "The investigator changed files; they were reverted: " + ", ".join(reverted)
+            )
+        del output
+        return investigation
+
+    def investigation_prompt(self, plan: RepairPlan, result_file: Path) -> str:
+        actions = "\n".join(
+            f"- {action.id}: {action.instruction.strip()}" for action in plan.actions
+        )
+        return "\n".join(
+            [
+                "# Read-only investigation",
+                "",
+                "Do NOT modify, create, move or delete any file in this repository.",
+                "Any change you make is reverted. Your only output is the JSON file below.",
+                "",
+                "Before these repair actions are attempted, establish the facts they",
+                "depend on from the repository itself: read the evidence, count files,",
+                "compute totals and ratios with read-only commands (for example a short",
+                "`python3 -c` over a JSON file), and use `git log` / `git show` for",
+                "history. Report what the data shows, including when it contradicts the",
+                "action or the manuscript.",
+                "",
+                *self._frozen_lines(),
+                "## Actions",
+                "",
+                actions,
+                "",
+                "## Output",
+                "",
+                f"Write JSON to `{result_file}`:",
+                '{"facts": [{"statement": "...", "source": "path:line or the exact command '
+                'and its output", "action_id": "ACTION-001"}], "unresolved": ["..."]}',
+                "",
+                "Every fact must name its source. If you could not verify something,",
+                "put it in `unresolved`; never state a number you did not compute or read.",
+            ]
+        )
 
     def _frozen_lines(self) -> list[str]:
         """Evidence the agent must never rewrite, whatever a finding asks."""

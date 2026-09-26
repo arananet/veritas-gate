@@ -1,0 +1,38 @@
+---
+title: Investigate the evidence read-only before each repair
+slug: investigation
+type: feature
+status: review
+author: Claude
+created_at: '2026-09-26'
+updated_at: '2026-09-26'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  Repairs answered "the denominator does not reconcile" with "requires
+  evidence not supplied", while the answer (315 executions, 350 rounds
+  because one scenario has two rounds) was in the run files. Before each
+  repair the loop runs the repair agent once in read-only mode with an
+  investigation prompt: establish facts from the repository, computing and
+  reading with read-only commands and git, each with a source. Any file it
+  changes is reverted; unsourced facts are dropped. Facts are stored per
+  iteration and given to the repair prompt as verified facts.
+acceptance_criteria:
+- "Given an investigator that writes facts and edits files, when it runs, then sourced facts are kept, unsourced ones dropped, unresolved items kept, and every edit reverted."
+- "Given the investigation prompt, when rendered, then it forbids changes, names frozen files, lists the actions and requires sources."
+- "Given verified facts, when the repair prompt is rendered, then they appear with their sources."
+- "Given loop.investigate and an agent that investigates, when the loop repairs, then investigation runs first, is saved as investigation.json, and its facts reach the repair."
+test_plan:
+- 'tests/test_investigation.py covers each criterion.'
+qa_notes: 'An investigation costs one extra agent run per iteration; set loop.investigate false to skip.'
+out_of_scope:
+- Verifying the facts independently of the agent beyond requiring a source.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - A denominator question is answered from the run files before repair.
+  metrics: []
+technical_notes: 'Reuses the repair agent command; restoration uses the workspace (git or source copy).'

@@ -110,6 +110,8 @@ class LoopReporter:
             "iteration": self._iteration,
             "evaluated": self._evaluated,
             "planned": self._planned,
+            "investigating": self._investigating,
+            "investigated": self._investigated,
             "repairing": self._repairing,
             "repaired": self._repaired,
             "delta": self._delta,
@@ -118,6 +120,27 @@ class LoopReporter:
             handler(payload)
 
     # ------------------------------------------------------------- events
+
+    def _investigating(self, payload: dict[str, Any]) -> None:
+        self._spinner.stop()
+        self.console.print("Investigating the evidence (read-only)...")
+
+    def _investigated(self, payload: dict[str, Any]) -> None:
+        investigation = payload["investigation"]
+        self.console.print(
+            f"  {len(investigation.facts)} verified fact(s), "
+            f"{len(investigation.unresolved)} unresolved"
+        )
+        for fact in investigation.facts[:8]:
+            self.console.print(f"    · {fact.statement} [dim]({fact.source})[/dim]")
+        if investigation.reverted:
+            self.console.print(
+                f"  [yellow]Reverted {len(investigation.reverted)} file(s) the "
+                "investigator changed.[/yellow]"
+            )
+        for note in investigation.notes:
+            if investigation.status == "failed":
+                self.console.print(f"  [yellow]{note}[/yellow]")
 
     def _iteration(self, payload: dict[str, Any]) -> None:
         self._spinner.stop()

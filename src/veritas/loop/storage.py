@@ -83,6 +83,9 @@ class LoopStore:
     def write_plan(self, iteration_dir: Path, plan: RepairPlan) -> None:
         _dump(iteration_dir / "repair-plan.json", plan.model_dump(mode="json"))
 
+    def write_json(self, iteration_dir: Path, name: str, model: Any) -> None:
+        _dump(iteration_dir / name, model.model_dump(mode="json"))
+
     def write_repair(self, iteration_dir: Path, repair: RepairResult) -> None:
         _dump(iteration_dir / "repair-result.json", repair.model_dump(mode="json"))
 

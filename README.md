@@ -111,6 +111,31 @@ Blocking findings:
 ╰────────╯
 ```
 
+### Beyond the gate: paper quality
+
+For a paper, the scientific-paper profile also covers what makes it reviewable,
+not only correct. Each is described in
+[docs/EVALUABLE_ARTIFACTS.md](docs/EVALUABLE_ARTIFACTS.md):
+
+- **Numeric traceability** — every number in the manuscript is found in the
+  evidence (as a value, rounding, percentage, or stated-denominator ratio).
+- **Derived-file provenance** — figures, tables and generated LaTeX are
+  declared with their command and inputs; `veritas build` records hashes, and
+  stale, hand-edited or provenance-less figures are reported.
+- **Frozen integrity** — frozen evidence is append-only; git history showing
+  an in-place edit is reported, and CITATION.cff must agree with tags and DOIs.
+- **Presentation** — process narration left in the paper, repeated hashes, a
+  long abstract, uncited figures; a presentation judge for structure and
+  captions, and a figures judge that looks at the rendered pages.
+- **PDF and venue** — unresolved references, fonts, overfull boxes; venue
+  rules (TMLR, arXiv) including a double-blind identity scan, and an
+  anonymized supplementary package.
+- **Investigation before repair** — the loop's repair agent first establishes
+  facts read-only, with sources; the repair works from verified facts.
+
+The repair agent only ever acts through its CLI on text, scripts and figures;
+evidence is frozen, and investigations are reverted if they touch anything.
+
 ---
 
 ## The separation is the design
@@ -563,6 +588,8 @@ spots do not decide the outcome.
 | `veritas loop --resume` | Continue from the previous loop's ledger |
 | `veritas loop --verbose` | Print the repair agent's full output as it runs |
 | `veritas scaffold` | Create missing citation and licensing files from your declared metadata |
+| `veritas build` | Regenerate declared figures and generated files; record their provenance in `veritas.lock.json` |
+| `veritas package -o supp.zip` | Anonymized supplementary archive for a double-blind venue, re-scanned for identity |
 | `veritas loop-report` | Show the report from the latest loop |
 | `veritas diff <a> <b>` | Compare two evaluations issue by issue |
 | `veritas profiles` | List every discoverable profile |
