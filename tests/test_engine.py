@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 
 from veritas.artifacts import Artifact
-from veritas.config import ConfigError, load_config
+from veritas.config import CheckConfig, ConfigError, load_config
 from veritas.engine import Engine, EngineOptions
 from veritas.profiles import load_profile
 from veritas.reports import render_markdown
@@ -322,3 +322,15 @@ def test_a_scoped_latex_file_brings_its_inputs(tmp_path: Path, repo_root: Path) 
     artifact = Artifact(id="a", type="document", root=tmp_path, paths=["main.tex", "doc.md"])
     scoped = engine._scoped_artifacts(artifact, engine.build_judges())
     assert {s.path for s in scoped["structure"].segments()} == {"main.tex", "table.tex"}
+
+
+def test_a_project_check_override_keeps_the_profile_fields_it_does_not_set(
+    tmp_path: Path, repo_root: Path
+) -> None:
+    config = config_for(tmp_path, "http://127.0.0.1:9", repo_root)
+    config.checks = {"arxiv-package": CheckConfig(target="paper/main.tex")}
+    engine = Engine(config, load_profile("scientific-paper", repo_root))
+    merged = engine.check_configs()["arxiv-package"]
+    assert merged.type == "arxiv-package"
+    assert merged.target == "paper/main.tex"
+    assert merged.severity_on_failure == "major"

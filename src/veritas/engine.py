@@ -157,7 +157,17 @@ class Engine:
     def check_configs(self) -> dict[str, CheckConfig]:
         """Profile checks, overridden by anything the project configured."""
         merged: dict[str, CheckConfig] = dict(self.profile.definition.checks)
-        merged.update(self.config.checks)
+        for name, override in self.config.checks.items():
+            base = merged.get(name)
+            if base is None:
+                merged[name] = override
+                continue
+            # Only what the project wrote overrides the profile. Replacing the
+            # whole check turned `arxiv-package: {target: ...}` into a command
+            # check with no command, because `type` fell back to its default.
+            merged[name] = CheckConfig.model_validate(
+                {**base.model_dump(), **override.model_dump(exclude_unset=True)}
+            )
         return {name: config for name, config in merged.items() if config.enabled}
 
     def gate_policy(self) -> GatePolicy:
