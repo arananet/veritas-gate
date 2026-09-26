@@ -112,6 +112,15 @@ checks:
     severity_on_failure: major
     max_package_mb: 50
 
+  # Generated files (figures, tables, LaTeX) declared under `derived:` must
+  # match what they were built from (veritas.lock.json, written by
+  # `veritas build`). Set target to the manuscript to also report figures no
+  # derivation produces.
+  derived-freshness:
+    type: derived-freshness
+    enabled: true
+    severity_on_failure: major
+
   # Every number in the manuscript must be traceable to the evidence: as a
   # value, a rounding, a percentage, or a ratio whose denominator the paper
   # states. Off until you name the manuscript and the evidence files:

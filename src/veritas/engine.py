@@ -256,7 +256,7 @@ class Engine:
         async def run_one(name: str, config: CheckConfig) -> CheckResult:
             async with semaphore:
                 self.options.progress("check", name, "start")
-                check = build_check(name, config, self.config.execution)
+                check = build_check(name, config, self.config.execution, self.config.derived)
                 result = await check.run(artifact)
                 self.options.progress("check", name, "ok" if result.passed else "fail")
                 return result

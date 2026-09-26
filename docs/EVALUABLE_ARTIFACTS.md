@@ -103,6 +103,37 @@ A claim resting only on them is reported as unverified (minor, declared), not
 as missing evidence. `veritas files` shows how many files are withheld. A path
 both in `paths` and `withheld` is supplied.
 
+## Declare what you generate
+
+Figures, tables and the LaTeX are generated from something. Declare it, and a
+stale PDF or a hand-edited figure stops being something a reviewer finds:
+
+```yaml
+execution:
+  allow: [node, python3]
+derived:
+  - id: heatmap
+    kind: figure
+    command: [python3, scripts/plot_heatmap.py]
+    inputs: [evidence/run/verdicts.json, scripts/plot_heatmap.py]
+    outputs: [paper/figures/heatmap.pdf]
+  - id: latex
+    command: [node, scripts/paper.mjs, latex]
+    inputs: [paper/manuscript.md, paper/template.tex]
+    outputs: [paper/manuscript.tex]
+checks:
+  derived-freshness:
+    target: paper/manuscript.md   # also report figures no derivation produces
+```
+
+`veritas build` runs each command (allow-listed, no shell) and records the
+hashes of its inputs and outputs in `veritas.lock.json`; commit it. The
+derived-freshness check then reports, without running anything, an output
+whose inputs changed (stale), an output changed by hand, a derivation never
+built, and a figure in the manuscript that no derivation produces. A
+derivation may read frozen evidence but never write it: a script that
+rewrites a frozen file is rejected and the file restored.
+
 ## Make every number traceable
 
 A reader should be able to find where each number in the paper comes from.

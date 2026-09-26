@@ -210,6 +210,26 @@ class CheckConfig(BaseModel):
     min_value: float = 11
 
 
+class Derivation(BaseModel):
+    """A file the paper uses that a script produces: a figure, a table, the LaTeX.
+
+    Declared so a reader can regenerate it, and so Veritas can tell when it no
+    longer matches what it was built from. The command runs only if its
+    executable is in execution.allow, with no shell.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(pattern=r"^[A-Za-z0-9._-]+$")
+    command: list[str] = Field(min_length=1)
+    inputs: list[str] = Field(default_factory=list)
+    outputs: list[str] = Field(min_length=1)
+    kind: Literal["figure", "table", "file"] = "file"
+    working_dir: str | None = None
+    timeout: float = 600.0
+    description: str | None = None
+
+
 class ExecutionConfig(BaseModel):
     """Allow-list for anything that runs a subprocess."""
 
@@ -466,6 +486,10 @@ class VeritasConfig(BaseModel):
     # recommend the narrowest wording it supports rather than removal. The
     # repair agent is told to preserve and bound them, never delete them.
     thesis: list[str] = Field(default_factory=list)
+    # Generated files with their command and inputs: `veritas build` runs them
+    # and records hashes in veritas.lock.json; the derived-freshness check
+    # reports anything stale, edited by hand, or used without provenance.
+    derived: list[Derivation] = Field(default_factory=list)
     concurrency: int = 4
     root: Path = Field(default_factory=Path.cwd, exclude=True)
 

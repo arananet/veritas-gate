@@ -194,6 +194,46 @@ def profiles(
 
 
 @app.command()
+def build(
+    path: Annotated[Path, typer.Argument(help="Project directory.")] = Path("."),
+    only: Annotated[
+        list[str] | None, typer.Option("--only", help="Build only these derivations.")
+    ] = None,
+    config: Annotated[Path | None, typer.Option(help="Path to veritas.yaml.")] = None,
+) -> None:
+    """Regenerate declared derived files and record their provenance.
+
+    Runs each derivation's command (allow-listed, no shell), then writes the
+    hashes of its inputs and outputs to veritas.lock.json. A derivation may
+    read frozen evidence but never write it.
+    """
+    from veritas.derive import LOCK_NAME
+    from veritas.derive import build as run_build
+
+    target = path.resolve()
+    loaded_config, _ = _prepare(target, None, config)
+    if not loaded_config.derived:
+        raise _fail("no derivations declared under `derived:` in veritas.yaml")
+    frozen = [*loaded_config.artifact.frozen, *loaded_config.artifact.withheld]
+    try:
+        results = run_build(
+            loaded_config.root, loaded_config.derived, loaded_config.execution, frozen, only
+        )
+    except ConfigError as exc:
+        raise _fail(str(exc)) from exc
+    failed = 0
+    for result in results:
+        if result.ok:
+            console.print(f"  [green]✓[/green] {result.id}: {', '.join(result.outputs)}")
+        else:
+            failed += 1
+            console.print(f"  [red]✗[/red] {result.id}: {result.detail}")
+    console.print(f"[dim]provenance: {loaded_config.root / LOCK_NAME}[/dim]")
+    if failed:
+        raise typer.Exit(1)
+
+
+@app.command()
 def files(
     path: Annotated[Path, typer.Argument(help="Artifact path.")] = Path("."),
     profile: Annotated[str | None, typer.Option(help="Profile name to use.")] = None,

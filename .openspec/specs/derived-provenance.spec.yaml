@@ -1,0 +1,43 @@
+---
+title: Generated figures and files carry provenance and are checked for freshness
+slug: derived-provenance
+type: feature
+status: review
+author: Claude
+created_at: '2026-09-26'
+updated_at: '2026-09-26'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  A published PDF lacked the DOI its Markdown carried, and an arXiv .bbl
+  lagged its .bib, because nothing tied a generated file to its sources.
+  `derived:` declares each generated file with its command, inputs and
+  outputs. `veritas build` runs allow-listed commands without a shell and
+  records input and output hashes in veritas.lock.json. The
+  derived-freshness check reports stale outputs, hand-edited outputs,
+  derivations never built, and figures in the manuscript no derivation
+  produces. A derivation may not declare or write a frozen path; a script
+  that changes frozen evidence is rejected and the files restored.
+acceptance_criteria:
+- "Given a built derivation, when the check runs, then it passes."
+- "Given a changed input, when the check runs, then the output is reported stale."
+- "Given an output changed with unchanged inputs, when the check runs, then it is reported as edited by hand."
+- "Given a declared derivation absent from the lock, when the check runs, then it is reported as never built."
+- "Given a manuscript figure no derivation produces, when the check runs, then it is reported."
+- "Given an executable outside execution.allow, when building, then it is refused."
+- "Given an output under a frozen path, when building, then it is refused."
+- "Given a script that rewrites frozen evidence, when building, then the build is rejected and the evidence restored."
+test_plan:
+- 'tests/test_derived.py covers each criterion.'
+qa_notes: 'Validated on a copy of a real paper repository: fresh, then stale after a manuscript edit.'
+out_of_scope:
+- Sandboxing beyond the allow-list and frozen-path restoration.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - A manuscript edit without regenerating LaTeX is reported as stale.
+  metrics: []
+technical_notes: 'Lock file: veritas.lock.json at the config root.'
