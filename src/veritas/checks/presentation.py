@@ -133,7 +133,7 @@ class PresentationCheck:
             return
         paragraphs = [p for p in re.split(r"\n\s*\n", body.strip()) if p.strip()]
         words = len(re.findall(r"\w+", body))
-        limit = int(getattr(self.config, "abstract_max_words", 300))
+        limit = self.config.abstract_max_words
         if len(paragraphs) > 1 or words > limit:
             problems = []
             if len(paragraphs) > 1:
@@ -160,7 +160,7 @@ class PresentationCheck:
         for block in _TEX_FIGURE.findall(text):
             count += 1
             labels.extend(_TEX_LABEL.findall(block))
-        if count == 0 and getattr(self.config, "require_figures", True):
+        if count == 0 and self.config.require_figures:
             self._add(
                 "The manuscript has no figure",
                 "minor",

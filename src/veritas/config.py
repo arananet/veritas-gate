@@ -208,6 +208,16 @@ class CheckConfig(BaseModel):
     sources: list[str] = Field(default_factory=list)
     ignore_numbers: list[str] = Field(default_factory=list)
     min_value: float = 11
+    # For presentation: abstract length and whether a paper must have a figure.
+    abstract_max_words: int = 300
+    require_figures: bool = True
+    # For pdf-inspection and venue: `target` is the built PDF, `source` the
+    # LaTeX. `venue` names the rules (tmlr, arxiv, preprint); identity_terms
+    # adds strings to hide beyond those read from CITATION.cff and the remote.
+    venue: str | None = None
+    source: str | None = None
+    identity_terms: list[str] = Field(default_factory=list)
+    anonymous: bool = False
 
 
 class Derivation(BaseModel):

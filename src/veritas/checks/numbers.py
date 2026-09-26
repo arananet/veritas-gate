@@ -65,7 +65,7 @@ class NumericTraceabilityCheck:
     async def run(self, artifact: Artifact) -> CheckResult:
         started = time.monotonic()
         target = self.config.target
-        sources = list(getattr(self.config, "sources", []) or [])
+        sources = list(self.config.sources)
         if not target or not sources:
             return CheckResult(
                 check=self.name,
@@ -91,8 +91,8 @@ class NumericTraceabilityCheck:
                 duration_seconds=_since(started),
             )
 
-        ignore = [re.compile(p) for p in getattr(self.config, "ignore_numbers", []) or []]
-        minimum = float(getattr(self.config, "min_value", 11))
+        ignore = [re.compile(p) for p in self.config.ignore_numbers]
+        minimum = self.config.min_value
         untraced: dict[str, list[str]] = {}
         checked = 0
         numbers = _manuscript_numbers(manuscript.read_text(encoding="utf-8", errors="replace"))

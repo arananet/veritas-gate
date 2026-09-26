@@ -145,6 +145,23 @@ checks:
     enabled: true
     severity_on_failure: major
 
+  # The built PDF: unresolved references, replacement characters, fonts not
+  # embedded, metadata, and the TeX log's overfull boxes and undefined labels.
+  # Set target to the PDF.
+  pdf-inspection:
+    type: pdf-inspection
+    enabled: true
+    severity_on_failure: major
+
+  # A venue's rules. Set venue (tmlr, arxiv, preprint), target (PDF) and
+  # source (LaTeX). For double-blind venues every identity term (from
+  # CITATION.cff, the git remote and identity_terms) is searched in the PDF
+  # text, metadata and source.
+  venue:
+    type: venue
+    enabled: true
+    severity_on_failure: major
+
   # Every number in the manuscript must be traceable to the evidence: as a
   # value, a rounding, a percentage, or a ratio whose denominator the paper
   # states. Off until you name the manuscript and the evidence files:

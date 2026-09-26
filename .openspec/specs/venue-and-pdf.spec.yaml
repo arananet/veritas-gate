@@ -1,0 +1,38 @@
+---
+title: PDF inspection, venue rules and anonymized packaging
+slug: venue-and-pdf
+type: feature
+status: review
+author: Claude
+created_at: '2026-09-26'
+updated_at: '2026-09-26'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  Preparing a double-blind submission was done by hand: identity terms found
+  in the PDF, its metadata and the source; appendix moved after the
+  references; pages counted; a supplementary zip anonymized and re-checked.
+  pdf-inspection reads the built PDF and its TeX log. venue applies named
+  rules (tmlr, arxiv, preprint), deriving identity terms from CITATION.cff
+  and the git remote. `veritas package` builds an anonymized archive of
+  tracked files and fails when a file still identifies the author.
+acceptance_criteria:
+- "Given CITATION.cff and a remote, when identity terms are derived, then names, ORCID, repository owner and archive DOIs are included."
+- "Given a double-blind venue and an identifying PDF, when the check runs, then a critical finding lists each place."
+- "Given tmlr, when the template is missing, loaded with options, the appendix precedes the references, or no broader impact exists, then each is reported."
+- "Given arxiv, when the PDF names the author, then nothing is reported."
+- "Given unresolved references, when pdf-inspection runs, then they are reported."
+- "Given packaging, when the archive is built, then only tracked files are included, local configuration excluded, text anonymized, and identifying binaries listed."
+test_plan:
+- 'tests/test_venue.py covers each criterion; PDF tests skip without pdflatex and poppler.'
+qa_notes: 'Validated on a real paper: arXiv passes, TMLR fails on identity and template, and packaging finds screenshot archives that still carry the name.'
+out_of_scope:
+- Rewriting binaries.
+implementation_skill:
+eval_plan:
+  scenarios: []
+  metrics: []
+technical_notes: 'Needs poppler-utils (pdftotext, pdfinfo, pdffonts) for PDF checks; skipped without.'

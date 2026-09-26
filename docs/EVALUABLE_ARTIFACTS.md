@@ -103,6 +103,36 @@ A claim resting only on them is reported as unverified (minor, declared), not
 as missing evidence. `veritas files` shows how many files are withheld. A path
 both in `paths` and `withheld` is supplied.
 
+## Prepare the submission
+
+Point Veritas at the built PDF and the venue:
+
+```yaml
+checks:
+  pdf-inspection:
+    target: paper/main.pdf
+  venue:
+    venue: tmlr            # tmlr, arxiv or preprint
+    target: paper/main.pdf
+    source: paper/main.tex
+    identity_terms: ["Acme Corp"]   # anything beyond CITATION.cff and the remote
+```
+
+pdf-inspection reports unresolved references (??), replacement characters,
+fonts not embedded, missing title metadata, and the TeX log's overfull boxes
+and undefined labels. venue applies the venue's rules: for a double-blind
+venue it searches every identity term (author names, ORCID, email and archive
+DOIs from CITATION.cff, the repository owner from the git remote) in the PDF
+text, its metadata and the source; it checks the mandatory template and its
+options, that the appendix follows the references, the main-text page count,
+and a broader impact statement.
+
+`veritas package -o supplementary.zip` builds the anonymized supplementary
+archive: git-tracked files only, local configuration excluded, identity terms
+replaced in text, then re-scanned. A binary that still contains a term (a
+screenshot archive, say) is listed and the command fails, so it is never
+uploaded unseen.
+
 ## Present it like reviewed work
 
 Set the presentation check's target to your manuscript:

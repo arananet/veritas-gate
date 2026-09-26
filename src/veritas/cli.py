@@ -234,6 +234,45 @@ def build(
 
 
 @app.command()
+def package(
+    path: Annotated[Path, typer.Argument(help="Project directory.")] = Path("."),
+    output: Annotated[Path, typer.Option("--output", "-o", help="Zip file to write.")] = Path(
+        "supplementary-anonymized.zip"
+    ),
+    term: Annotated[
+        list[str] | None, typer.Option("--term", help="Extra identity term to hide (repeatable).")
+    ] = None,
+) -> None:
+    """Build an anonymized supplementary archive for a double-blind venue.
+
+    Copies only git-tracked files, replaces every identity term (from
+    CITATION.cff, the git remote and --term) in text files, zips the result,
+    and re-scans it. Files that still contain a term are listed and the
+    command fails: check them before uploading.
+    """
+    from veritas.venue import identity_terms, package_anonymized
+
+    target = path.resolve()
+    terms = identity_terms(target, list(term or []))
+    if not terms:
+        raise _fail("no identity terms found: add CITATION.cff authors or pass --term")
+    try:
+        result = package_anonymized(target, output.resolve(), terms)
+    except ValueError as exc:
+        raise _fail(str(exc)) from exc
+    console.print(f"Hidden: {', '.join(terms)}")
+    for hidden, count in sorted(result.replaced.items()):
+        console.print(f"  {hidden}: {count} replacement(s)")
+    console.print(f"{result.files} file(s) -> [bold]{result.archive}[/bold]")
+    if result.remaining:
+        console.print("[red]Still identifying (check before uploading):[/red]")
+        for item in result.remaining:
+            console.print(f"  {item}")
+        raise typer.Exit(1)
+    console.print("[green]No identity term remains in the archive.[/green]")
+
+
+@app.command()
 def files(
     path: Annotated[Path, typer.Argument(help="Artifact path.")] = Path("."),
     profile: Annotated[str | None, typer.Option(help="Profile name to use.")] = None,
