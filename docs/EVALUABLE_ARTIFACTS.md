@@ -103,6 +103,27 @@ A claim resting only on them is reported as unverified (minor, declared), not
 as missing evidence. `veritas files` shows how many files are withheld. A path
 both in `paths` and `withheld` is supplied.
 
+## Make every number traceable
+
+A reader should be able to find where each number in the paper comes from.
+Name the manuscript and the evidence, and Veritas checks every number:
+
+```yaml
+checks:
+  numeric-traceability:
+    enabled: true
+    target: paper/manuscript.md
+    sources: [evidence/run/verdicts.json, evidence/run/run_meta.json]
+    ignore_numbers: ["128"]      # parameters, not results
+```
+
+A number is traced when the evidence contains it, rounded as written, as a
+percentage, or as the ratio of two evidence numbers whose denominator the
+paper itself states (135/100 = 1.35). Identifiers, dates, versions, hashes,
+section references and integers below 11 are skipped. A derived count such as
+9 x 7 x 5 = 315 is reported: compute it in a declared script and supply its
+output, so the reader can check it too.
+
 ## Freeze your evidence
 
 A repair agent asked to resolve "the report contradicts the defect record"

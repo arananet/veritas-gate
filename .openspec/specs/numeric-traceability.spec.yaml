@@ -1,0 +1,40 @@
+---
+title: Every number in the manuscript is traceable to the evidence
+slug: numeric-traceability
+type: feature
+status: review
+author: Claude
+created_at: '2026-09-26'
+updated_at: '2026-09-26'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  A paper divided 135 gate calls by 350 retrievals where the gated
+  denominator was 100; three LLM evaluations argued about it before anyone
+  opened the run files. The numeric-traceability check extracts claim-like
+  numbers from the manuscript and reports those no configured evidence
+  source contains: as a value, a rounding to the written precision, a
+  percentage, or a ratio of two evidence numbers whose denominator the paper
+  states. Identifiers, dates, versions, hashes, links, code, section
+  references and small integers are skipped.
+acceptance_criteria:
+- "Given numbers present in the evidence, when the check runs, then it passes."
+- "Given a number absent from the evidence, when the check runs, then it is reported with its line."
+- "Given a percentage or a ratio with a denominator the paper states, when the check runs, then it is traced."
+- "Given a ratio whose denominator the paper never states, when the check runs, then it is not traced."
+- "Given identifiers, dates, versions, links and small counts, when the check runs, then they are ignored."
+- "Given ignore_numbers, when a token matches, then it is not checked."
+test_plan:
+- 'tests/test_check_numbers.py covers each criterion.'
+qa_notes: 'Heuristic: tracing proves a number exists in the evidence, not that it is used correctly.'
+out_of_scope:
+- Deciding that a traced number is used correctly.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - On a real paper, a derived count absent from the evidence is reported.
+  metrics: []
+technical_notes: 'Off in the profile until target and sources are configured.'

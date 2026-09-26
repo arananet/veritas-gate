@@ -5,6 +5,7 @@ from __future__ import annotations
 from veritas.checks.arxiv import ArxivPackageCheck
 from veritas.checks.base import Check, check_finding
 from veritas.checks.command import CommandCheck, CommandNotAllowedError
+from veritas.checks.numbers import NumericTraceabilityCheck
 from veritas.checks.references import ReferenceIntegrityCheck
 from veritas.checks.structure import (
     ContentPatternsCheck,
@@ -20,6 +21,7 @@ CHECK_TYPES = (
     "content-patterns",
     "reference-integrity",
     "arxiv-package",
+    "numeric-traceability",
 )
 
 __all__ = [
@@ -29,6 +31,7 @@ __all__ = [
     "CommandCheck",
     "CommandNotAllowedError",
     "ContentPatternsCheck",
+    "NumericTraceabilityCheck",
     "ReferenceIntegrityCheck",
     "RequiredPathsCheck",
     "RequiredSectionsCheck",
@@ -51,6 +54,8 @@ def build_check(name: str, config: CheckConfig, execution: ExecutionConfig) -> C
         return ReferenceIntegrityCheck(name, config)
     if config.type == "arxiv-package":
         return ArxivPackageCheck(name, config)
+    if config.type == "numeric-traceability":
+        return NumericTraceabilityCheck(name, config)
     raise ConfigError(
         f"check '{name}' has unknown type '{config.type}'; known types: {', '.join(CHECK_TYPES)}"
     )

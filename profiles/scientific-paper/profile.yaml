@@ -112,6 +112,15 @@ checks:
     severity_on_failure: major
     max_package_mb: 50
 
+  # Every number in the manuscript must be traceable to the evidence: as a
+  # value, a rounding, a percentage, or a ratio whose denominator the paper
+  # states. Off until you name the manuscript and the evidence files:
+  #   checks: {numeric-traceability: {enabled: true, target: ..., sources: [...]}}
+  numeric-traceability:
+    type: numeric-traceability
+    enabled: false
+    severity_on_failure: minor
+
   # Off by default: these are conventions, not universal requirements, and a
   # profile should not fail a paper for a convention its venue does not hold.
   # Enable in your veritas.yaml and set `target` to your manuscript.

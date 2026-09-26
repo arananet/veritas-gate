@@ -202,6 +202,12 @@ class CheckConfig(BaseModel):
     severity_on_unsupplied: Literal["info", "minor", "major", "critical"] = "minor"
     # For arxiv-package: arXiv's limit on a submission's total size.
     max_package_mb: float = 50.0
+    # For numeric-traceability: evidence files (paths or globs) whose numbers
+    # the manuscript may cite, numbers to leave alone (regular expressions over
+    # the token as written), and the smallest integer worth tracing.
+    sources: list[str] = Field(default_factory=list)
+    ignore_numbers: list[str] = Field(default_factory=list)
+    min_value: float = 11
 
 
 class ExecutionConfig(BaseModel):
