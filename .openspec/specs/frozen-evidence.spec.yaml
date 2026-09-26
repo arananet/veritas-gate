@@ -1,0 +1,40 @@
+---
+title: The repair agent can never change frozen evidence
+slug: frozen-evidence
+type: feature
+status: review
+author: Claude
+created_at: '2026-09-26'
+updated_at: '2026-09-26'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  Asked to resolve "the frozen validation report contradicts the run's defect
+  record", a repair agent rewrote the frozen report, and the patch Veritas
+  offered carried the change to the operator's tree. Rewriting the record of
+  what an experiment produced is fabrication by another name.
+  `artifact.frozen` lists glob patterns (withheld paths are included). The
+  agent's prompt names them as never to be modified; any change to one is
+  reverted in the workspace after the repair and reported in the repair notes,
+  so it never reaches the offered patch.
+acceptance_criteria:
+- "Given a frozen pattern, when the agent changes a matching file, then the workspace file is restored and the change is not in files_changed."
+- "Given a reverted change, when the repair is recorded, then its notes name the reverted files."
+- "Given frozen patterns, when the repair prompt is built, then it lists them under Frozen files."
+- "Given withheld patterns, when the loop runs, then they are frozen too."
+test_plan:
+- 'tests/test_loop.py covers reversion and pattern matching.'
+qa_notes: |
+  Restoration uses git in a worktree and the source copy in copy mode.
+out_of_scope:
+- Protecting files outside the workspace.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - A repair that edits evidence/ is reverted before the patch is offered.
+  metrics: []
+technical_notes: |
+  Patterns match with fnmatch, a directory prefix, or a trailing /**.

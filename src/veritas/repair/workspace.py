@@ -73,6 +73,29 @@ class Workspace:
         changed |= {name for name in snapshot if name not in now}
         return sorted(changed)
 
+    def restore(self, paths: list[str]) -> list[str]:
+        """Put ``paths`` (relative to scan_root) back as they were. Returns those restored."""
+        restored: list[str] = []
+        for rel in paths:
+            target = self.scan_root / rel
+            if self.is_git:
+                tracked = _git(self.scan_root, "ls-files", "--error-unmatch", "--", rel)
+                if tracked is not None:
+                    if _git(self.scan_root, "checkout", "HEAD", "--", rel) is None:
+                        continue
+                else:
+                    target.unlink(missing_ok=True)
+                restored.append(rel)
+            elif self.source is not None:
+                original = self.source / rel
+                if original.is_file():
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(original, target)
+                else:
+                    target.unlink(missing_ok=True)
+                restored.append(rel)
+        return restored
+
     def diff(self) -> str:
         """A unified patch of the working tree, or an empty string without git."""
         if not self.is_git:

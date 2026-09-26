@@ -621,11 +621,13 @@ def loop(
     workspace_config = loaded_config.model_copy()
     workspace_config.root = workspace.root
 
+    frozen = [*loaded_config.artifact.frozen, *loaded_config.artifact.withheld]
     try:
         agent_impl = build_repair_agent(
             loaded_config.repair,
             on_output=reporter.agent_output,
             thesis=loaded_config.thesis,
+            frozen=frozen,
         )
     except ConfigError as exc:
         raise _fail(str(exc)) from exc
@@ -637,6 +639,7 @@ def loop(
         loaded_config.loop,
         store,
         LoopOptions(
+            frozen=frozen,
             max_iterations=max_iterations,
             dry_run=dry_run,
             resume=resume,

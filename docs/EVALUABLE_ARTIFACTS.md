@@ -103,6 +103,23 @@ A claim resting only on them is reported as unverified (minor, declared), not
 as missing evidence. `veritas files` shows how many files are withheld. A path
 both in `paths` and `withheld` is supplied.
 
+## Freeze your evidence
+
+A repair agent asked to resolve "the report contradicts the defect record"
+may simply rewrite the report. List the files that record what an experiment
+produced, and no repair can change them:
+
+```yaml
+artifact:
+  frozen:
+    - evidence/**
+```
+
+Withheld paths are frozen too. The agent is told, and any change it makes to a
+frozen file is reverted in the workspace and reported, so the patch you are
+offered never contains one. Correct a frozen record in the paper or an errata
+file.
+
 ## Check the package before arXiv does
 
 For a LaTeX paper the `arxiv-package` check (on in `scientific-paper`)

@@ -22,6 +22,7 @@ its work succeeded. Every exit carries an explicit StopReason.
 
 from __future__ import annotations
 
+import fnmatch
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -68,6 +69,19 @@ def _noop(event: str, payload: dict[str, Any]) -> None:  # pragma: no cover - de
     return None
 
 
+def is_frozen(path: str, patterns: list[str]) -> bool:
+    """Whether ``path`` matches a frozen glob, or sits under a frozen directory."""
+    for pattern in patterns:
+        clean = pattern.strip().removeprefix("./").rstrip("/")
+        if not clean:
+            continue
+        if fnmatch.fnmatchcase(path, clean) or path.startswith(clean + "/"):
+            return True
+        if clean.endswith("/**") and path.startswith(clean[:-3] + "/"):
+            return True
+    return False
+
+
 @dataclass(slots=True)
 class LoopOptions:
     """Per-invocation switches for one loop."""
@@ -78,6 +92,8 @@ class LoopOptions:
     progress: LoopProgress = _noop
     now: Callable[[], datetime] = lambda: datetime.now(UTC)
     extra: dict[str, Any] = field(default_factory=dict)
+    # Glob patterns the repair agent may never change (frozen evidence).
+    frozen: list[str] = field(default_factory=list)
 
 
 class LoopOrchestrator:
@@ -252,6 +268,18 @@ class LoopOrchestrator:
             observed = [
                 path for path in workspace.changed_since(before) if not path.startswith(".veritas/")
             ]
+            touched = [path for path in observed if is_frozen(path, self.options.frozen)]
+            if touched:
+                # Frozen evidence is the record of what happened. A repair that
+                # rewrites it makes the paper cite something the experiment
+                # never produced, so the change is undone, not offered.
+                restored = workspace.restore(touched)
+                observed = [path for path in observed if path not in restored]
+                repair.notes.append(
+                    "Reverted changes to frozen evidence: "
+                    + ", ".join(restored)
+                    + ". Record a correction in the paper or an errata file instead."
+                )
             record.changed_files = observed
             for path in observed:
                 if path not in changed_files:

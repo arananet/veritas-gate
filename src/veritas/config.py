@@ -350,6 +350,10 @@ class ArtifactConfig(BaseModel):
     # exist, so their absence is weighed as unverified rather than missing.
     withheld: list[str] = Field(default_factory=list)
     withheld_reason: str | None = None
+    # Paths the repair agent must never change: frozen evidence, the record of
+    # what an experiment actually produced. Withheld paths are frozen too. A
+    # repair that touches one is reverted in the workspace and reported.
+    frozen: list[str] = Field(default_factory=list)
 
 
 class ModelPrice(BaseModel):

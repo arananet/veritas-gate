@@ -467,3 +467,41 @@ async def test_a_deferred_decision_is_marked_for_review_exactly_once(tmp_path: P
     result = await orchestrator.run(artifact, workspace)
     reviewed = [item for item in result.ledger if item.status == "HUMAN_REVIEW"]
     assert len(reviewed) == len({item.id for item in reviewed})
+
+
+async def test_a_repair_to_frozen_evidence_is_reverted(tmp_path: Path) -> None:
+    """A repair agent rewrote a frozen validation report; the change must not survive."""
+    source = tmp_path / "src"
+    (source / "evidence").mkdir(parents=True)
+    (source / "evidence" / "report.md").write_text("frozen\n")
+
+    def edits(workspace: Workspace, plan: RepairPlan) -> list[AppliedChange]:
+        return [
+            write_file(workspace, "doc.md", "# Doc\n\nFixed.\n", "naming"),
+            write_file(workspace, "evidence/report.md", "rewritten\n", "made it agree"),
+        ]
+
+    orchestrator, workspace, artifact = make_loop(
+        tmp_path,
+        [revise([repairable()]), passing()],
+        agent=MockRepairAgent(edits=edits),
+        options=LoopOptions(frozen=["evidence/**"]),
+    )
+    (workspace.root / "evidence").mkdir()
+    (workspace.root / "evidence" / "report.md").write_text("frozen\n")
+    workspace.source = source
+    result = await orchestrator.run(artifact, workspace)
+
+    assert (workspace.root / "evidence" / "report.md").read_text() == "frozen\n"
+    assert result.files_changed == ["doc.md"]
+    notes = result.iterations[0].repair.notes
+    assert any("frozen evidence" in note for note in notes)
+
+
+def test_frozen_patterns_match_globs_and_directories() -> None:
+    from veritas.loop.orchestrator import is_frozen
+
+    assert is_frozen("evidence/run/a.json", ["evidence/**"])
+    assert is_frozen("evidence/run/a.json", ["evidence/run"])
+    assert is_frozen("evidence/run/CB-1.json", ["evidence/run/CB-*"])
+    assert not is_frozen("paper/main.tex", ["evidence/**"])

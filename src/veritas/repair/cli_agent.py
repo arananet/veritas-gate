@@ -66,7 +66,9 @@ class GenericCLIRepairAgent:
         prompt: str | None = None,
         on_output: Callable[[str], None] | None = None,
         thesis: list[str] | None = None,
+        frozen: list[str] | None = None,
     ) -> None:
+        self.frozen = list(frozen or [])
         self.config = config
         self.permissions = permissions or RepairPermissions()
         self.prompt_template = prompt if prompt is not None else load_repair_prompt()
@@ -215,6 +217,7 @@ class GenericCLIRepairAgent:
             f"- Alter scientific claims: {_yesno(self.permissions.scientific_claims)}",
             "",
             *self._thesis_lines(),
+            *self._frozen_lines(),
             f"## Repair plan (iteration {plan.iteration})",
             "",
             f"The machine-readable plan is at `{plan_file}`.",
@@ -237,6 +240,21 @@ class GenericCLIRepairAgent:
                 ]
             )
         return "\n".join(sections)
+
+    def _frozen_lines(self) -> list[str]:
+        """Evidence the agent must never rewrite, whatever a finding asks."""
+        if not self.frozen:
+            return []
+        return [
+            "## Frozen files (never modify)",
+            "",
+            "These record what an experiment actually produced. Do not edit, move or",
+            "delete them, even where a finding says they are wrong. Record a correction",
+            "in the manuscript or an errata file instead. Changes here are reverted.",
+            "",
+            *[f"- `{item}`" for item in self.frozen],
+            "",
+        ]
 
     def _thesis_lines(self) -> list[str]:
         """What the work sets out to show: bound it to the evidence, never delete it."""
