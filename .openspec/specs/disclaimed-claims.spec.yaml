@@ -1,0 +1,38 @@
+---
+title: A claim the artifact disclaims is not recorded as unsupported
+slug: disclaimed-claims
+type: bugfix
+status: review
+author: Claude
+created_at: '2026-09-26'
+updated_at: '2026-09-26'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  A paper narrowed to say "not an empirical demonstration of all six
+  mechanisms" and "does not estimate model-independent efficacy" then received
+  five blocking findings for claiming exactly those things: the claim-extracting
+  judge recorded each disclaimer as the claim it denies, and marked it
+  unsupported. Claims now carry a stance; a disclaimed claim is dropped before
+  the claim graph, and claim-extracting judges are told to record only what the
+  artifact asserts, qualifiers intact.
+acceptance_criteria:
+- "Given a claim with stance disclaimed, when a judge result is built, then it is not recorded."
+- "Given a claim-extracting judge, when its system prompt is built, then it states the disclaimer rule; other judges do not receive it."
+test_plan:
+- 'tests/test_judges.py covers both criteria.'
+qa_notes: |
+  An overclaim the artifact does assert is still reported, with the asserting
+  sentence quoted.
+out_of_scope:
+- Detecting negation deterministically.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - A paper that disclaims a result is not blocked for claiming it.
+  metrics: []
+technical_notes: |
+  stance defaults to asserted, so older provider output is unaffected.

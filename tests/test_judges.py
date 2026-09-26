@@ -138,6 +138,33 @@ async def test_a_claim_with_no_evidence_is_never_reported_as_verified(
     assert result.claims[0].status == "unverified"
 
 
+async def test_a_disclaimed_claim_is_not_recorded_as_unsupported(
+    tmp_path: Path, serve, context
+) -> None:
+    """A paper saying "we do not demonstrate all six" is not claiming all six.
+
+    Recorded as the claim, each disclaimer became a blocking "unsupported claim"
+    in exactly the paper that had just been narrowed to avoid it.
+    """
+    payload = {
+        "claims": [
+            {
+                "text": "The pilot demonstrates all six mechanisms.",
+                "status": "unsupported",
+                "stance": "disclaimed",
+                "evidence": ["Abstract: rather than six empirically demonstrated mechanisms"],
+            },
+            {"text": "Namespacing excluded distractors.", "status": "verified", "evidence": ["T3"]},
+        ]
+    }
+    with serve(reply(payload)) as server:
+        judge = judge_for(server.base_url, extracts_claims=True)
+        result = await judge.evaluate(make_artifact(tmp_path, "x"), context)
+    assert [claim.text for claim in result.claims] == ["Namespacing excluded distractors."]
+    assert "disclaims" in judge.system_prompt(context)
+    assert "disclaims" not in judge_for(server.base_url).system_prompt(context)
+
+
 async def test_malformed_output_produces_an_error_result_not_an_exception(
     tmp_path: Path, serve, context
 ) -> None:

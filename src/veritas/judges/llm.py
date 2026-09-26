@@ -49,6 +49,25 @@ class RawClaim(BaseModel):
     status: str = "unverified"
     evidence: list[str] = Field(default_factory=list)
     rationale: str | None = None
+    # Whether the artifact makes this claim or explicitly disclaims it. A paper
+    # that says "we do not demonstrate X" is not claiming X.
+    stance: str = Field(
+        default="asserted",
+        description=(
+            "'asserted' if the artifact makes this claim; 'disclaimed' if the "
+            "artifact explicitly denies or disclaims it."
+        ),
+    )
+
+
+CLAIM_RULES = (
+    "CLAIMS: record only what the artifact asserts, with its qualifiers intact. "
+    'A statement the artifact explicitly disclaims ("we do not show X", "X was '
+    'not evaluated", "not a demonstration of X") is not a claim of X: do not '
+    "record X as unsupported. If you list it at all, set stance to 'disclaimed'. "
+    "Report an overclaim only where the artifact actually asserts it, and quote "
+    "the asserting sentence as evidence."
+)
 
 
 class JudgeResponse(BaseModel):
@@ -102,6 +121,8 @@ class LLMJudge:
         ]
         if context.rubric:
             parts.append(f"Rubric (authoritative, from the profile): {context.rubric}")
+        if self.extracts_claims:
+            parts.append(CLAIM_RULES)
         if context.thesis:
             parts.append(thesis_section(context.thesis))
         if context.withheld:
@@ -181,7 +202,8 @@ class LLMJudge:
             return [], []
         claims: list[Claim] = []
         evidence: list[Evidence] = []
-        for index, raw in enumerate(payload.claims, start=1):
+        asserted = [raw for raw in payload.claims if raw.stance.strip().lower() != "disclaimed"]
+        for index, raw in enumerate(asserted, start=1):
             claim_id = f"{self.category_prefix}-CLAIM-{index:03d}"
             evidence_ids: list[str] = []
             for position, item in enumerate(raw.evidence, start=1):
