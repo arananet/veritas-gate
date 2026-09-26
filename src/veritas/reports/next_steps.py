@@ -38,6 +38,21 @@ def next_steps(
     """
     if gate_status == "PASS":
         return [Step("Nothing blocks this work. Commit it, and deposit the version you cite.")]
+    if gate_status == "PASS_WITH_WARNINGS":
+        # The gate passed: calling its warnings "blocking" contradicted the
+        # verdict printed just above.
+        accepted = accepted or set()
+        warned = [f for f in findings if f.id in (blocking or set()) and f.id not in accepted]
+        passed = [Step("Nothing blocks this work. Commit it, and deposit the version you cite.")]
+        if warned:
+            passed.append(
+                Step(
+                    f"{len(warned)} warning(s) worth a look, none blocking; "
+                    "fix any you agree with, or leave them.",
+                    "veritas findings .",
+                )
+            )
+        return passed
 
     accepted = accepted or set()
     live = [f for f in findings if f.id not in accepted]

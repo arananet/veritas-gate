@@ -265,7 +265,8 @@ class ConsoleReporter:
         findings = [item for item in result.meta_review.findings if item.id in blocking]
         if not findings:
             return
-        self.console.print("Blocking findings:")
+        passed = result.gate.status == "PASS_WITH_WARNINGS"
+        self.console.print("Warnings (not blocking):" if passed else "Blocking findings:")
         self.console.print()
         for finding in sorted(findings, key=lambda item: -severity_rank(item.severity)):
             style = SEVERITY_STYLE[finding.severity]

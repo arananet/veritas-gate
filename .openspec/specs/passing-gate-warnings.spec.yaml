@@ -1,0 +1,30 @@
+---
+title: A passing gate never calls its warnings blocking
+slug: passing-gate-warnings
+type: bugfix
+status: review
+author: Claude
+created_at: '2026-09-26'
+updated_at: '2026-09-26'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  A PASS_WITH_WARNINGS run listed its minor findings under "Blocking findings"
+  and its next steps said "4 blocking issue(s) are fixable", beside a gate
+  that had passed. The console now titles them "Warnings (not blocking)" and
+  the next steps say nothing blocks, with the warnings offered, not required.
+acceptance_criteria:
+- "Given PASS_WITH_WARNINGS, when next steps are built, then they say nothing blocks and count warnings without calling them blocking."
+- "Given PASS_WITH_WARNINGS, when the console summary prints, then the list is titled Warnings (not blocking)."
+test_plan:
+- 'tests/test_triage.py covers next steps.'
+qa_notes: ''
+out_of_scope: []
+implementation_skill:
+eval_plan:
+  scenarios: []
+  metrics: []
+technical_notes: ''

@@ -216,3 +216,17 @@ def test_an_oversized_request_is_permanent_and_points_at_artifact_paths() -> Non
     text = " ".join(s.text for s in next_steps([failed], "FAIL", can_repair=True))
     assert "artifact.paths" in text and "judge_paths" in text
     assert "concurrency" not in text
+
+
+def test_a_passing_gate_never_calls_its_warnings_blocking() -> None:
+    from veritas.models.finding import Finding
+    from veritas.reports.next_steps import next_steps
+
+    warning = Finding(
+        id="M-1", title="Small sample", severity="minor", category="c", description="d"
+    )
+    steps = next_steps([warning], "PASS_WITH_WARNINGS", can_repair=True, blocking={"M-1"})
+    text = " ".join(step.text for step in steps)
+    assert "Nothing blocks" in text
+    assert "blocking issue" not in text
+    assert "1 warning(s)" in text
