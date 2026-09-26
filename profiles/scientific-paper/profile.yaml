@@ -121,6 +121,15 @@ checks:
     enabled: true
     severity_on_failure: major
 
+  # Frozen evidence (artifact.frozen) is append-only: git must show no commit
+  # that modified a frozen file, and nothing modified now. Also compares
+  # CITATION.cff's version with the tags, and (with target) the manuscript's
+  # archive DOIs with CITATION.cff.
+  frozen-integrity:
+    type: frozen-integrity
+    enabled: true
+    severity_on_failure: major
+
   # Every number in the manuscript must be traceable to the evidence: as a
   # value, a rounding, a percentage, or a ratio whose denominator the paper
   # states. Off until you name the manuscript and the evidence files:

@@ -110,3 +110,12 @@ def test_a_script_that_rewrites_evidence_is_rejected(tmp_path: Path) -> None:
     assert not result.ok
     assert "frozen evidence" in result.detail
     assert (tmp_path / "evidence" / "run.json").read_text(encoding="utf-8") == '{"value": 1}'
+
+
+def test_frozen_exclusions() -> None:
+    from veritas.derive import is_frozen
+
+    patterns = ["evidence/**", "!evidence/README.md"]
+    assert is_frozen("evidence/run/a.json", patterns)
+    assert not is_frozen("evidence/README.md", patterns)
+    assert not is_frozen("paper/main.tex", patterns)

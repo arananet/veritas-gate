@@ -167,6 +167,22 @@ artifact:
     - evidence/**
 ```
 
+Exclude files that change on purpose, such as an index or a stable pointer,
+with `!`, as in `.gitignore`:
+
+```yaml
+  frozen:
+    - evidence/**
+    - "!evidence/README.md"
+```
+
+The frozen-integrity check asks git whether any frozen file was changed by a
+commit after it was first committed, or is changed now: frozen evidence is
+append-only, so a correction goes in a new file (for example
+`evidence/<run>/corrections/`), never over the original. It also compares
+CITATION.cff's `version` with the git tags and, with `target` set, the
+manuscript's archive DOIs with CITATION.cff.
+
 Withheld paths are frozen too. The agent is told, and any change it makes to a
 frozen file is reverted in the workspace and reported, so the patch you are
 offered never contains one. Correct a frozen record in the paper or an errata

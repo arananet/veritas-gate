@@ -1,0 +1,40 @@
+---
+title: Frozen evidence is append-only and release metadata is consistent
+slug: frozen-integrity
+type: feature
+status: review
+author: Claude
+created_at: '2026-09-26'
+updated_at: '2026-09-26'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  A frozen validation report was edited in place by two later commits and a
+  release archived the edited copy. The frozen-integrity check asks git for
+  commits that modified a frozen file after it was committed, and for
+  uncommitted changes to one; adding files is allowed. It compares
+  CITATION.cff's version with the git tags and, with target, the
+  manuscript's archive DOIs with CITATION.cff. Frozen patterns accept
+  `!`-prefixed exclusions for files that change on purpose.
+acceptance_criteria:
+- "Given untouched frozen evidence and consistent metadata, when the check runs, then it passes."
+- "Given a commit that modified a frozen file, when the check runs, then it is reported with the commit."
+- "Given a new file added under a frozen path, when the check runs, then it passes."
+- "Given an uncommitted change to a frozen file, when the check runs, then it is reported."
+- "Given a `!` exclusion, when the excluded file changes, then nothing is reported."
+- "Given a CITATION.cff version with no tag, or a manuscript DOI absent from CITATION.cff, when the check runs, then each is reported."
+- "Given a directory outside git, when the check runs, then it is skipped."
+test_plan:
+- 'tests/test_check_integrity.py and tests/test_derived.py cover each criterion.'
+qa_notes: 'A shallow clone checks only the history it has, and says so.'
+out_of_scope:
+- Resolving DOIs over the network.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - A real repository whose evidence index changes by design passes once the index is excluded.
+  metrics: []
+technical_notes: 'Uses git log --diff-filter=M per frozen file.'

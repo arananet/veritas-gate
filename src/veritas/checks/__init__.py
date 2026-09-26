@@ -6,6 +6,7 @@ from veritas.checks.arxiv import ArxivPackageCheck
 from veritas.checks.base import Check, check_finding
 from veritas.checks.command import CommandCheck, CommandNotAllowedError
 from veritas.checks.derived import DerivedFreshnessCheck
+from veritas.checks.integrity import FrozenIntegrityCheck
 from veritas.checks.numbers import NumericTraceabilityCheck
 from veritas.checks.references import ReferenceIntegrityCheck
 from veritas.checks.structure import (
@@ -24,6 +25,7 @@ CHECK_TYPES = (
     "arxiv-package",
     "numeric-traceability",
     "derived-freshness",
+    "frozen-integrity",
 )
 
 __all__ = [
@@ -47,6 +49,7 @@ def build_check(
     config: CheckConfig,
     execution: ExecutionConfig,
     derived: list[Derivation] | None = None,
+    frozen: list[str] | None = None,
 ) -> Check:
     """Instantiate the check implementation named by ``config.type``."""
     if config.type == "command":
@@ -65,6 +68,8 @@ def build_check(
         return NumericTraceabilityCheck(name, config)
     if config.type == "derived-freshness":
         return DerivedFreshnessCheck(name, config, list(derived or []))
+    if config.type == "frozen-integrity":
+        return FrozenIntegrityCheck(name, config, list(frozen or []))
     raise ConfigError(
         f"check '{name}' has unknown type '{config.type}'; known types: {', '.join(CHECK_TYPES)}"
     )

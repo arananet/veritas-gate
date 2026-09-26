@@ -22,7 +22,6 @@ its work succeeded. Every exit carries an explicit StopReason.
 
 from __future__ import annotations
 
-import fnmatch
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -70,16 +69,10 @@ def _noop(event: str, payload: dict[str, Any]) -> None:  # pragma: no cover - de
 
 
 def is_frozen(path: str, patterns: list[str]) -> bool:
-    """Whether ``path`` matches a frozen glob, or sits under a frozen directory."""
-    for pattern in patterns:
-        clean = pattern.strip().removeprefix("./").rstrip("/")
-        if not clean:
-            continue
-        if fnmatch.fnmatchcase(path, clean) or path.startswith(clean + "/"):
-            return True
-        if clean.endswith("/**") and path.startswith(clean[:-3] + "/"):
-            return True
-    return False
+    """Whether ``path`` matches a frozen glob and no `!` exclusion."""
+    from veritas.derive import is_frozen as frozen
+
+    return frozen(path, patterns)
 
 
 @dataclass(slots=True)

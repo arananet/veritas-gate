@@ -78,7 +78,24 @@ def write_lock(root: Path, entries: dict[str, dict[str, object]]) -> Path:
     return path
 
 
+def frozen_files(root: Path, patterns: list[str]) -> list[str]:
+    """Files under frozen patterns, minus `!`-prefixed exclusions (as in .gitignore)."""
+    return [path for path in expand(root, _positive(patterns)) if is_frozen(path, patterns)]
+
+
+def _positive(patterns: list[str]) -> list[str]:
+    return [p for p in patterns if not p.strip().startswith("!")]
+
+
 def is_frozen(path: str, patterns: list[str]) -> bool:
+    """Whether ``path`` is frozen: matched by a pattern and by no `!` exclusion."""
+    excluded = [p.strip()[1:] for p in patterns if p.strip().startswith("!")]
+    if excluded and _matches(path, excluded):
+        return False
+    return _matches(path, _positive(patterns))
+
+
+def _matches(path: str, patterns: list[str]) -> bool:
     for pattern in patterns:
         clean = pattern.strip().removeprefix("./").rstrip("/")
         if not clean:
@@ -153,9 +170,9 @@ def _run_all(
     results: list[BuildResult] = []
     for derivation in selected:
         cwd = (root / derivation.working_dir).resolve() if derivation.working_dir else root
-        frozen_files = expand(root, frozen)
-        frozen_before = hashes(root, frozen_files)
-        backup = _backup(root, frozen_files)
+        frozen_list = frozen_files(root, frozen)
+        frozen_before = hashes(root, frozen_list)
+        backup = _backup(root, frozen_list)
         if backup is not None:
             backups.append(backup)
         try:
@@ -171,10 +188,9 @@ def _run_all(
         except (OSError, subprocess.TimeoutExpired) as exc:
             results.append(BuildResult(derivation.id, False, str(exc)))
             continue
-        if hashes(root, list(frozen_before)) != frozen_before or set(expand(root, frozen)) != set(
-            frozen_files
-        ):
-            restored = _restore(root, backup, frozen_files)
+        now_frozen = set(frozen_files(root, frozen))
+        if hashes(root, list(frozen_before)) != frozen_before or now_frozen != set(frozen_list):
+            restored = _restore(root, backup, frozen_list)
             results.append(
                 BuildResult(
                     derivation.id,
