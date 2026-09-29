@@ -354,3 +354,20 @@ def test_a_judge_with_max_input_chars_sees_only_the_start_of_the_manuscript(
     assert segment.text.startswith("# Title")
     assert len(segment.text) < 6200
     assert "methodology" not in scoped  # other judges keep the whole artifact
+
+
+async def test_a_skipped_check_is_reported_as_skipped_not_ok(
+    tmp_path: Path, repo_root: Path
+) -> None:
+    events: list[tuple[str, str, str]] = []
+    config = config_for(tmp_path, "http://127.0.0.1:9", repo_root)
+    engine = Engine(
+        config,
+        load_profile("scientific-paper", repo_root),
+        EngineOptions(progress=lambda *event: events.append(event)),
+    )
+    await engine._run_checks(artifact_for(tmp_path))
+    done = {
+        name: status for phase, name, status in events if phase == "check" and status != "start"
+    }
+    assert done["presentation"] == "skipped"  # no target configured

@@ -279,3 +279,46 @@ def test_other_findings_still_produce_actions_beside_a_judge_error() -> None:
     plan = RepairPlanner(RepairPermissions()).plan(result, 1)
     assert len(plan.actions) == 1
     assert plan.actions[0].finding_ids == ["A-1"]
+
+
+def _unfinished(disposition: str) -> Finding:
+    return Finding(
+        id="DESK-TRIAGE-001",
+        title="Unfinished evaluation remains pending",
+        severity="major",
+        category="desk-triage",
+        description="The abstract says 52 of 350 rounds remain unresolved pending review.",
+        location="paper/v3/main.tex",
+        evidence=["Of 350 scored rounds, 52 remain unresolved pending human review."],
+        recommendation="Requires new work: adjudicate the 52 rounds.",
+        disposition=disposition,  # type: ignore[arg-type]
+    )
+
+
+def test_a_decision_is_never_sent_to_the_repair_agent() -> None:
+    """Rewording "52 rounds remain unresolved" would hide unfinished work."""
+    action = planner().plan(evaluation([_unfinished("decision")]), iteration=1).actions[0]
+    assert not action.autonomous
+    assert action.requires_human_approval
+
+
+def test_requires_new_work_is_new_evidence_whatever_the_disposition() -> None:
+    action = planner().plan(evaluation([_unfinished("artifact")]), iteration=1).actions[0]
+    assert action.requires_new_evidence
+    assert not action.autonomous
+
+
+def test_a_configuration_finding_is_for_veritas_yaml_not_the_work() -> None:
+    item = Finding(
+        id="CHECK-1",
+        title="Cited path exists but was not supplied",
+        severity="minor",
+        category="check/reference-integrity/unsupplied",
+        description="d",
+        location="paper/main.md",
+        recommendation="Add it to artifact.paths.",
+        disposition="configuration",
+    )
+    action = planner().plan(evaluation([item]), iteration=1).actions[0]
+    assert not action.autonomous
+    assert "veritas.yaml" in (action.blocked_reason or "")

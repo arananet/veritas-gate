@@ -281,7 +281,10 @@ class Engine:
                     [*self.config.artifact.frozen, *self.config.artifact.withheld],
                 )
                 result = await check.run(artifact)
-                self.options.progress("check", name, "ok" if result.passed else "fail")
+                status = {"skipped": "skipped", "error": "error"}.get(
+                    result.status, "ok" if result.passed else "fail"
+                )
+                self.options.progress("check", name, status)
                 return result
 
         return list(await asyncio.gather(*(run_one(name, cfg) for name, cfg in configs.items())))

@@ -34,6 +34,8 @@ STATUS_MARK = {
     "fail": ("✗ ", "red"),
     # A verdict and a breakdown must never look alike.
     "error": ("⚠ ", "bold red"),
+    # A check that did not run must not look like one that passed.
+    "skipped": ("○ ", "dim"),
 }
 
 
@@ -121,7 +123,8 @@ class ConsoleReporter:
             self._spinner.mark_running(name)
             return
         mark, style = STATUS_MARK.get(status, ("  ", ""))
-        self._spinner.mark_done(name, f"  [{style}]{mark}[/{style}]{name}")
+        suffix = " [dim](skipped: not configured)[/dim]" if status == "skipped" else ""
+        self._spinner.mark_done(name, f"  [{style}]{mark}[/{style}]{name}{suffix}")
 
     def summary(self, result: EvaluationResult, *, can_repair: bool = False) -> None:
         self._spinner.stop()

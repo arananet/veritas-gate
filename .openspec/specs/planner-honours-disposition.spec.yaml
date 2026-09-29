@@ -1,0 +1,41 @@
+---
+title: The planner honours triage, and skipped checks look skipped
+slug: planner-honours-disposition
+type: bugfix
+status: review
+author: Claude
+created_at: '2026-09-29'
+updated_at: '2026-09-29'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  A desk-triage run rejected a paper for "52 rounds remain unresolved pending
+  review", and Veritas proposed the repair loop. The easiest repair is to
+  delete the sentence, which hides unfinished work. The planner ignored each
+  finding's disposition, so a `decision` (only the author can resolve it) or
+  a `configuration` finding was dispatched to the repair agent like any
+  other. The planner now marks both human-only with the reason; a
+  recommendation beginning "Requires new work" counts as new evidence; and
+  the desk-triage prompt sets disposition `decision` when what decides is
+  unfinished work.
+
+  In the same run a presentation check with no target showed ✓. A skipped
+  check now shows ○ with "(skipped: not configured)", and an erroring one ⚠.
+acceptance_criteria:
+- "Given a finding with disposition decision, when planned, then its action requires human approval and is not autonomous."
+- "Given a recommendation beginning 'Requires new work', when planned, then the action requires new evidence."
+- "Given only configuration findings, when planned, then the action is human-only and names veritas.yaml."
+- "Given a check that skips, when progress is reported, then its status is skipped, not ok."
+test_plan:
+- 'tests/test_delta_and_planner.py and tests/test_engine.py.'
+qa_notes: ''
+out_of_scope: []
+implementation_skill:
+eval_plan:
+  scenarios:
+  - A desk-triage rejection for unfinished work stops the loop at a human decision.
+  metrics: []
+technical_notes: ''

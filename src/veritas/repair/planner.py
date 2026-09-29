@@ -40,6 +40,7 @@ EVIDENCE_CATEGORY_HINTS = (
 # Phrases in a recommendation that mean "produce new measurements". An agent
 # asked to do this cannot comply honestly, so the action is never autonomous.
 NEW_EVIDENCE_PHRASES = (
+    "requires new work",
     "run the experiment",
     "run experiments",
     "re-run",
@@ -175,6 +176,12 @@ class RepairPlanner:
             # finding's category suggested.
             if action_type in ("artifact_edit", "documentation"):
                 action_type = "experiment"
+        elif owner := _owner_other_than_the_work(group):
+            # Triage already said who acts. A decision is the author's and a
+            # configuration issue lives in veritas.yaml: neither is an edit a
+            # repair agent should attempt on the manuscript.
+            requires_human = True
+            blocked_reason = owner
         elif not self.permissions.allows(action_type):
             requires_human = True
             blocked_reason = self.permissions.reason_for(action_type)
@@ -261,6 +268,19 @@ def _evidence_for(group: list[Finding], index: dict[str, list[str]]) -> list[str
             if item not in collected:
                 collected.append(item)
     return collected
+
+
+def _owner_other_than_the_work(group: list[Finding]) -> str | None:
+    dispositions = {finding.disposition for finding in group}
+    if "decision" in dispositions:
+        return (
+            "Only the author can resolve this: it depends on work, a choice or a fact "
+            "the artifact does not contain. Rewording the manuscript would hide it, "
+            "not resolve it."
+        )
+    if dispositions == {"configuration"}:
+        return "This is a Veritas configuration issue: change veritas.yaml, not the work."
+    return None
 
 
 def _requires_new_evidence(group: list[Finding], available: list[str]) -> bool:

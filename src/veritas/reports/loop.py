@@ -101,7 +101,8 @@ class LoopReporter:
             self._spinner.mark_running(name)
             return
         mark, style = STATUS_MARK.get(status, ("  ", ""))
-        self._spinner.mark_done(name, f"    [{style}]{mark}[/{style}]{name}")
+        suffix = " [dim](skipped: not configured)[/dim]" if status == "skipped" else ""
+        self._spinner.mark_done(name, f"    [{style}]{mark}[/{style}]{name}{suffix}")
 
     def progress(self, event: str, payload: dict[str, Any]) -> None:
         if self.quiet:

@@ -38,6 +38,14 @@ Report what you would decide:
   abstract would need to say instead, using only results the manuscript
   already reports.
 
+When what decides the rejection is work that is not finished (pending review,
+unresolved rounds, an untested safeguard, a run not yet made), set the
+finding's disposition to `decision` and begin its recommendation with
+"Requires new work:". Rewording or moving that sentence would hide unfinished
+work from the editor, not finish it; only the author can resolve it, by doing
+the work. Use disposition `artifact` only when the fix is presentation: what
+already exists, stated better.
+
 Never recommend new experiments, new data or new claims: that is decided
 elsewhere and by the author. You judge only whether what exists is presented
 so an editor would read further.
