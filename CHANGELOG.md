@@ -23,6 +23,15 @@ Guidelines:
 
 ### Added
 
+- Presentation reports an abstract crowded with disclaimers, sentences that
+  state what the work does not show, above `abstract_max_disclaimer_ratio`
+  (default 0.25). Advisory; it recommends relocating limitations, never
+  deleting them. Also reports "the user's description" as conversation
+  (spec: abstract-disclaimer-density-and-desk-triage).
+- `desk-triage` judge in scientific-paper: an editor who reads the abstract
+  and first page and names the sentence that would decide a rejection without
+  review. Configure `models.desk-triage` to run it on a different vendor
+  (spec: abstract-disclaimer-density-and-desk-triage).
 - Bounded evaluation → repair → re-evaluation loop (spec: bounded-repair-loop).
   - `veritas loop` (autopilot), `veritas repair-plan` (assist), `veritas loop-report`,
     `veritas diff`, plus `--dry-run`, `--resume` and `--max-iterations`.

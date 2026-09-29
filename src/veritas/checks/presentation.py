@@ -36,9 +36,38 @@ PROCESS_PATTERNS: list[tuple[str, str]] = [
     (r"\bEPERM\b|\bENOENT\b|\bpanicked\b|\bexit (?:code )?1\d\d\b", "tool failure"),
     (r"(?i)\btimed out after \d+\s*ms\b", "tool timeout"),
     (r"(?i)\b\d+ passed(?:,| and) \d+ failed\b", "test tally"),
-    (r"(?i)\bat the user'?s request\b|\bthe user asked\b", "conversation"),
+    (
+        r"(?i)\bat the user'?s request\b|\bthe user asked\b"
+        r"|\bthe user'?s (?:description|instructions?|prompt|request)\b",
+        "conversation",
+    ),
     (r"(?i)\bas an AI\b|\bI (?:have|will) (?:now )?(?:updated|added|removed)\b", "assistant voice"),
 ]
+
+# A sentence that tells the reader what the work does not show or has not done.
+# Bare negation is not counted: "the core is not sufficient" is a result, and a
+# negative result stated plainly is good presentation. Calibrated on three real
+# abstracts: two desk-rejected or flagged drafts (0.36, 0.37) and one accepted
+# preprint whose negatives are findings (0.11).
+_DISCLAIMER = re.compile(
+    r"""(?ix)
+    \b(?:does|do|did|is|are|was|were|can|could)\s*(?:not|n't)\s+
+        (?:establish|prove|show|estimate|measure|claim|isolate|model|demonstrate
+          |mean|imply|constitute|cover|evaluate|test|replicate|generali[sz]e)
+    | \bnot\s+(?:evaluated|measured|executed|tested|claimed|established|assessed
+          |verified|demonstrated|examined|studied|intrinsic
+          |a\s+(?:proof|ranking|replication|measurement|guarantee)
+          |\w+\s+measurements)
+    | \bno\s+(?:LLM|experiment|performance|user\s+study|independent|fresh|security\s+review)
+    | \bremains?\s+(?:pending|unresolved|unexecuted|untested)
+    | \bpending\s+(?:human\s+)?review
+    | \brather\s+than\s+(?:\w+\s+){0,3}(?:empirically|demonstrated|measured|proven)
+    | \b(?:concern|apply\s+to|limited\s+to)\s+(?:the|these)\s+(?:tested|evaluated|inspected)
+    | \bwithin-scenario\b | \bonly\s+(?:clean|one|a\s+single)\b
+    | \bwas\s+blocked\b | \bretrospective\b
+    """
+)
+_SENTENCE = re.compile(r"(?<=[.;])\s+(?=[A-Z(])")
 
 _HEX = re.compile(r"\b[0-9a-f]{20,64}\b")
 _MD_IMAGE = re.compile(r"!\[[^\]]*\]\(([^)\s]+)[^)]*\)(\{#([\w:.-]+)[^}]*\})?")
@@ -131,6 +160,7 @@ class PresentationCheck:
             body = latex.group(1)
         if body is None:
             return
+        self._hedging(target, body)
         paragraphs = [p for p in re.split(r"\n\s*\n", body.strip()) if p.strip()]
         words = len(re.findall(r"\w+", body))
         limit = self.config.abstract_max_words
@@ -148,6 +178,37 @@ class PresentationCheck:
                 target,
                 "One paragraph: the problem, what was done, the main result with its "
                 "number, and its scope.",
+            )
+
+    def _hedging(self, target: str, body: str) -> None:
+        """Report an abstract whose disclaimers crowd out its result.
+
+        Each limitation may be correct; stated in the abstract one after another
+        they bury the finding, and an editor triaging on the abstract reads the
+        work as unfinished. Advisory: a count cannot tell a needed scope
+        statement from a redundant one, so this never blocks on its own.
+        """
+        sentences = [s for s in _SENTENCE.split(" ".join(body.split())) if s.strip()]
+        if len(sentences) < 3:
+            return
+        flagged = [s for s in sentences if _DISCLAIMER.search(s)]
+        ratio = len(flagged) / len(sentences)
+        limit = self.config.abstract_max_disclaimer_ratio
+        if len(flagged) >= 3 and ratio > limit:
+            self._add(
+                f"Abstract spends {len(flagged)} of {len(sentences)} sentences on what "
+                f"the work does not show ({ratio:.0%}, limit {limit:.0%})",
+                "minor",
+                "The limitations may all be true. Concentrated in the abstract they hide "
+                "the result, and a reader triaging on the abstract takes the work for "
+                "unfinished. Scope belongs in the sentence that states the result; the "
+                "rest belongs in Limitations, once each.",
+                target,
+                "State each main result with its scope in one sentence ('in the N "
+                "evaluated scenarios, X excluded Y'). Keep at most one sentence of "
+                "limitations in the abstract and move the others to Limitations. Do "
+                "not delete a limitation; relocate it.",
+                [f"{target}: {s[:120]}" for s in flagged[:10]],
             )
 
     def _figures(self, target: str, text: str) -> None:

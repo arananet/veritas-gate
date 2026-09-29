@@ -210,6 +210,8 @@ class CheckConfig(BaseModel):
     min_value: float = 11
     # For presentation: abstract length and whether a paper must have a figure.
     abstract_max_words: int = 300
+    # Share of abstract sentences that disclaim rather than report (presentation).
+    abstract_max_disclaimer_ratio: float = 0.25
     require_figures: bool = True
     # For pdf-inspection and venue: `target` is the built PDF, `source` the
     # LaTeX. `venue` names the rules (tmlr, arxiv, preprint); identity_terms

@@ -1,0 +1,57 @@
+---
+title: Report abstracts crowded with disclaimers, and simulate desk triage
+slug: abstract-disclaimer-density-and-desk-triage
+type: feature
+status: review
+author: Claude
+created_at: '2026-09-29'
+updated_at: '2026-09-29'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  The gate pushed in one direction only. A claim the evidence did not reach
+  was blocking; a limitation the artifact declared was capped at minor
+  (triage.declared), and a disclaimed claim was dropped (disclaimed-claims).
+  A repair loop therefore converges on adding disclaimers, and did: a
+  benchmark paper reached 7 disclaiming sentences of 19 in its abstract and
+  was desk-rejected by TMLR in one day without review. Nothing reported the
+  cost of that honesty to the reader.
+
+  The presentation check now counts abstract sentences that state what the
+  work does not show or has not done, and reports the abstract when they exceed
+  a configurable share. Bare negation is not counted, because a negative
+  result stated plainly is a result. A desk-triage judge simulates an editor
+  who reads only the title, abstract and first page, and reports the sentence
+  that would decide a rejection without review.
+acceptance_criteria:
+- "Given an abstract with at least 3 disclaiming sentences above abstract_max_disclaimer_ratio (default 0.25), when presentation runs, then one minor finding lists them."
+- "Given an abstract whose negations are findings, when presentation runs, then no disclaimer finding is reported."
+- "Given the disclaimer finding, then its recommendation relocates limitations and never deletes them."
+- "Given abstract_max_disclaimer_ratio raised, when presentation runs, then the threshold is honoured."
+- "Given 'the user's description' in the manuscript, when presentation runs, then it is reported as conversation."
+- "Given the scientific-paper profile, then it declares a desk-triage judge with its own model role, falling back to models.default."
+test_plan:
+- 'tests/test_check_presentation.py covers the first five criteria using three real abstracts in tests/fixtures/abstracts.'
+- 'tests/test_config.py covers the judge list.'
+qa_notes: |
+  Calibration on the fixtures: 0.36 and 0.37 for the two flagged drafts, 0.11
+  for the accepted preprint. A count of bare negations does not separate them
+  (0.36, 0.58, 0.56) and was rejected. The finding is advisory by design: a
+  pattern cannot tell a necessary scope statement from a redundant one.
+out_of_scope:
+- Changing the declared-limitation ceiling in triage.py.
+- Scoring hedging outside the abstract.
+- Any repair permission change: moving a limitation is documentation; deleting one remains scientific_claims.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - Run desk-triage on both flagged drafts on a vendor different from the judges that produced the disclaimers, and record whether it names a disclaiming sentence as decisive.
+  metrics: []
+technical_notes: |
+  The desk-triage judge is told to read only the first page even though the
+  full artifact is supplied; the engine does not truncate its input. If the
+  instruction is not honoured in practice, a truncating artifact view is the
+  follow-up.

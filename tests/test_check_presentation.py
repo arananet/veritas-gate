@@ -84,3 +84,60 @@ async def test_latex_figures_are_understood(tmp_path: Path) -> None:
         "See Figure~\\ref{fig:a}.\n"
     )
     assert (await run(tmp_path, text)).status == "pass"
+
+
+# Disclaimer density. Fixtures are real abstracts: two drafts that were flagged
+# or desk-rejected, and one accepted preprint whose negatives are results.
+ABSTRACTS = Path(__file__).parent / "fixtures" / "abstracts"
+UI_ABSTRACT = (ABSTRACTS / "flagged_case_study.txt").read_text(encoding="utf-8")
+CONTAM_ABSTRACT = (ABSTRACTS / "desk_rejected_benchmark.txt").read_text(encoding="utf-8")
+ACCEPTED_ABSTRACT = (ABSTRACTS / "accepted_negative_results.txt").read_text(encoding="utf-8")
+
+
+def with_abstract(body: str) -> str:
+    return f"# Abstract\n\n{body}\n\n# Results\n\nFigure @fig:main.\n\n![M](m.pdf){{#fig:main}}\n"
+
+
+def disclaimer_findings(result) -> list[str]:
+    return [t for t in titles(result) if "does not show" in t]
+
+
+async def test_crowded_abstracts_are_reported(tmp_path: Path) -> None:
+    for body in (UI_ABSTRACT, CONTAM_ABSTRACT):
+        result = await run(tmp_path, with_abstract(body), abstract_max_words=1000)
+        assert disclaimer_findings(result), body[:40]
+
+
+async def test_negative_results_are_not_disclaimers(tmp_path: Path) -> None:
+    result = await run(tmp_path, with_abstract(ACCEPTED_ABSTRACT), abstract_max_words=1000)
+    assert not disclaimer_findings(result)
+
+
+async def test_disclaimer_finding_is_advisory(tmp_path: Path) -> None:
+    result = await run(tmp_path, with_abstract(CONTAM_ABSTRACT), abstract_max_words=1000)
+    finding = next(f for f in result.findings if "does not show" in f.title)
+    assert finding.severity == "minor"
+    assert "relocate" in finding.recommendation
+
+
+async def test_disclaimer_ratio_is_configurable(tmp_path: Path) -> None:
+    result = await run(
+        tmp_path,
+        with_abstract(UI_ABSTRACT),
+        abstract_max_words=1000,
+        abstract_max_disclaimer_ratio=0.5,
+    )
+    assert not disclaimer_findings(result)
+
+
+async def test_short_abstract_with_one_scope_sentence_passes(tmp_path: Path) -> None:
+    body = (
+        "We find X. In the nine evaluated scenarios, namespaces excluded Y. "
+        "The result does not establish real-world prevalence."
+    )
+    assert not disclaimer_findings(await run(tmp_path, with_abstract(body)))
+
+
+async def test_users_description_is_conversation(tmp_path: Path) -> None:
+    text = CLEAN + "\nThe user's description of that project motivated our questions.\n"
+    assert any("conversation" in t for t in titles(await run(tmp_path, text)))
