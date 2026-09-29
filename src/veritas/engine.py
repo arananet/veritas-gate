@@ -159,16 +159,16 @@ class Engine:
                     )
                 )
                 continue
-            judges.append(
-                LLMJudge(
-                    name=spec.name,
-                    prompt=self.profile.prompt_for(spec),
-                    provider=self.provider_for(role),
-                    version=spec.version,
-                    extracts_claims=spec.extracts_claims,
-                    model_role=role,
-                )
+            judge = LLMJudge(
+                name=spec.name,
+                prompt=self.profile.prompt_for(spec),
+                provider=self.provider_for(role),
+                version=spec.version,
+                extracts_claims=spec.extracts_claims,
+                model_role=role,
             )
+            judge.max_input_chars = spec.max_input_chars
+            judges.append(judge)
         return judges
 
     def check_configs(self) -> dict[str, CheckConfig]:
@@ -335,7 +335,7 @@ class Engine:
         """
         wanted = self.config.judge_paths
         if not wanted:
-            return {}
+            return self._truncated(artifact, judges, {})
         known = {spec.name for spec in self.profile.definition.judges}
         unknown = sorted(set(wanted) - known)
         if unknown:
@@ -368,6 +368,42 @@ class Engine:
                         kept.append(extra)
                         pending.append(extra)
             scoped[judge.name] = replace(artifact, _segments=kept)
+        return self._truncated(artifact, judges, scoped)
+
+    def _truncated(
+        self, artifact: Artifact, judges: list[LLMJudge], scoped: dict[str, Artifact]
+    ) -> dict[str, Artifact]:
+        """Give a judge with max_input_chars only the start of its first document.
+
+        A desk-triage judge told in its prompt to read only the first page was
+        still handed the whole artifact. The first document is the first
+        judge_paths entry for that judge, or else the first artifact.paths entry
+        that yields a segment: normally the manuscript.
+        """
+        for judge in judges:
+            limit = getattr(judge, "max_input_chars", None)
+            if not limit:
+                continue
+            base = scoped.get(judge.name, artifact)
+            segments = base.segments()
+            if not segments:
+                continue
+            order = [
+                *self.config.judge_paths.get(judge.name, []),
+                *artifact.paths,
+            ]
+
+            def rank(path: str, order: list[str] = order) -> int:
+                for index, prefix in enumerate(order):
+                    clean = prefix.strip("/").removeprefix("./")
+                    if path == clean or path.startswith(clean + "/"):
+                        return index
+                return len(order)
+
+            first = min(segments, key=lambda segment: (rank(segment.path), segment.path))
+            scoped[judge.name] = replace(
+                base, _segments=[first.truncated(limit)], max_file_chars=limit
+            )
         return scoped
 
     def _meta_provider(self) -> ModelProvider | None:

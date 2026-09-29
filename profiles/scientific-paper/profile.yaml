@@ -71,6 +71,8 @@ judges:
   - name: desk-triage
     prompt: desk_triage.md
     model_role: desk-triage
+    # Title, abstract and roughly the first page of the manuscript, nothing else.
+    max_input_chars: 6000
     version: "1"
     description: Simulates an editor deciding from the abstract and first page whether to send the paper to review.
 

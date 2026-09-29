@@ -44,6 +44,9 @@ class JudgeSpec(BaseModel):
     extracts_claims: bool = False
     # A visual judge reviews rendered pages of artifact.pdf instead of text.
     visual: bool = False
+    # Show the judge only the first N characters of the first document in its
+    # scope (the manuscript), as an editor triaging on the first page would.
+    max_input_chars: int | None = None
     description: str = ""
 
 

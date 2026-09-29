@@ -334,3 +334,23 @@ def test_a_project_check_override_keeps_the_profile_fields_it_does_not_set(
     assert merged.type == "arxiv-package"
     assert merged.target == "paper/main.tex"
     assert merged.severity_on_failure == "major"
+
+
+def test_a_judge_with_max_input_chars_sees_only_the_start_of_the_manuscript(
+    tmp_path: Path, repo_root: Path
+) -> None:
+    (tmp_path / "paper").mkdir()
+    (tmp_path / "paper" / "manuscript.md").write_text("# Title\n\nAbstract. " + "x" * 9000)
+    (tmp_path / "evidence.json").write_text("{}")
+    config = config_for(tmp_path, "http://127.0.0.1:9", repo_root)
+    engine = Engine(config, load_profile("scientific-paper", repo_root))
+    artifact = Artifact(
+        id="a", type="paper", root=tmp_path, paths=["paper/manuscript.md", "evidence.json"]
+    )
+    judges = engine.build_judges()
+    scoped = engine._scoped_artifacts(artifact, judges)
+    [segment] = scoped["desk-triage"].segments()
+    assert segment.path == "paper/manuscript.md"
+    assert segment.text.startswith("# Title")
+    assert len(segment.text) < 6200
+    assert "methodology" not in scoped  # other judges keep the whole artifact

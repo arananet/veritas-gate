@@ -33,9 +33,10 @@ acceptance_criteria:
 - "Given abstract_max_disclaimer_ratio raised, when presentation runs, then the threshold is honoured."
 - "Given 'the user's description' in the manuscript, when presentation runs, then it is reported as conversation."
 - "Given the scientific-paper profile, then it declares a desk-triage judge with its own model role, falling back to models.default."
+- "Given a judge with max_input_chars, when judges are scoped, then it receives only the first document of its scope (judge_paths, else artifact.paths order) truncated to that length, and other judges are unaffected."
 test_plan:
 - 'tests/test_check_presentation.py covers the first five criteria using three real abstracts in tests/fixtures/abstracts.'
-- 'tests/test_config.py covers the judge list.'
+- 'tests/test_config.py covers the judge list; tests/test_engine.py the truncated view.'
 qa_notes: |
   Calibration on the fixtures: 0.36 and 0.37 for the two flagged drafts, 0.11
   for the accepted preprint. A count of bare negations does not separate them
@@ -51,7 +52,6 @@ eval_plan:
   - Run desk-triage on both flagged drafts on a vendor different from the judges that produced the disclaimers, and record whether it names a disclaiming sentence as decisive.
   metrics: []
 technical_notes: |
-  The desk-triage judge is told to read only the first page even though the
-  full artifact is supplied; the engine does not truncate its input. If the
-  instruction is not honoured in practice, a truncating artifact view is the
-  follow-up.
+  The desk-triage judge declares max_input_chars: 6000 in the profile; the
+  engine hands it only the start of the first document in its scope, so the
+  first-page limit is enforced rather than requested in the prompt.

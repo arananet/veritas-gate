@@ -107,6 +107,8 @@ class LLMJudge:
         self.category_prefix = category_prefix or _prefix_from_name(name)
         self.extracts_claims = extracts_claims
         self.model_role = model_role
+        # When set, the engine shows this judge only the start of its first document.
+        self.max_input_chars: int | None = None
 
     def system_prompt(self, context: EvaluationContext) -> str:
         parts = [
