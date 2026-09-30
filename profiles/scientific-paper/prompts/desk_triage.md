@@ -22,6 +22,11 @@ Rejection at this stage is decided by impressions that are cheap to form:
   the abstract lists them one after another, the work reads as not ready.
 - **Scope that shrinks to nothing.** One model, one setting, a pilot, a case
   study, each restated until the claim no longer generalises to anything.
+- **Nothing that sells the result early.** No number in the abstract, no
+  list of contributions in the introduction, no figure on the first pages.
+  Papers sent to review usually have all three.
+- **Pilot scale.** A handful of scenarios or one model, where comparable
+  submissions report tens to thousands and several models.
 - **Wrong venue.** No contribution the venue's audience would recognise as
   theirs (for a machine learning venue: nothing about learning, models or
   data).

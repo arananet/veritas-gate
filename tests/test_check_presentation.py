@@ -12,10 +12,11 @@ from veritas.config import CheckConfig, ExecutionConfig
 
 pytestmark = pytest.mark.asyncio
 
+RESULT = "We show one result, clearly: accuracy rises from 61% to 74%."
 HASH = "378aabee42a69c61edc7d7a37c934465b4a66e30"
 CLEAN = """# Abstract
 
-We show one result, clearly.
+We show one result, clearly: accuracy rises from 61% to 74%.
 
 # Results
 
@@ -63,23 +64,25 @@ async def test_a_hash_repeated_in_prose_but_not_in_urls(tmp_path: Path) -> None:
 
 
 async def test_a_multi_paragraph_or_long_abstract(tmp_path: Path) -> None:
-    text = CLEAN.replace("We show one result, clearly.", "One.\n\nTwo.")
-    assert titles(await run(tmp_path, text)) == ["Abstract is 2 paragraphs"]
-    long = CLEAN.replace("We show one result, clearly.", "word " * 320)
+    text = CLEAN.replace(RESULT, "One.\n\nTwo.")
+    assert titles(await run(tmp_path, text, abstract_requires_number=False)) == [
+        "Abstract is 2 paragraphs"
+    ]
+    long = CLEAN.replace(RESULT, "word " * 320)
     assert titles(await run(tmp_path, long))[0].startswith("Abstract is 3")
 
 
 async def test_figures_missing_or_never_cited(tmp_path: Path) -> None:
     uncited = CLEAN.replace("Figure @fig:main shows it.", "It is shown.")
     assert titles(await run(tmp_path, uncited)) == ["Figure never referenced in the text: fig:main"]
-    none = "# Abstract\n\nOne result.\n\n# Results\n\nText only.\n"
+    none = "# Abstract\n\nOne result, 12%.\n\n# Results\n\nText only.\n"
     assert titles(await run(tmp_path, none)) == ["The manuscript has no figure"]
     assert (await run(tmp_path, none, require_figures=False)).status == "pass"
 
 
 async def test_latex_figures_are_understood(tmp_path: Path) -> None:
     text = (
-        "\\begin{abstract}One.\\end{abstract}\n"
+        "\\begin{abstract}One, 2.5 points.\\end{abstract}\n"
         "\\begin{figure}\\includegraphics{a}\\caption{A}\\label{fig:a}\\end{figure}\n"
         "See Figure~\\ref{fig:a}.\n"
     )
@@ -141,3 +144,71 @@ async def test_short_abstract_with_one_scope_sentence_passes(tmp_path: Path) -> 
 async def test_users_description_is_conversation(tmp_path: Path) -> None:
     text = CLEAN + "\nThe user's description of that project motivated our questions.\n"
     assert any("conversation" in t for t in titles(await run(tmp_path, text)))
+
+
+FRONT = """# Abstract
+
+Our method helps agents.
+
+# Introduction
+
+Agents are useful. We study them.
+
+# Related Work
+
+Others studied agents.
+
+Table 1: Hyperparameters.
+
+# Results
+
+Figure @fig:main shows it.
+
+![Main result](figures/main.pdf){#fig:main}
+"""
+
+
+async def test_front_matter_gaps_are_reported(tmp_path: Path) -> None:
+    result = await run(tmp_path, FRONT)
+    assert titles(result) == [
+        "Abstract reports no quantitative result",
+        "Introduction does not list its contributions",
+        "No table positions the work against prior work",
+    ]
+    assert all(f.severity == "minor" for f in result.findings)
+
+
+async def test_front_matter_done_well_passes(tmp_path: Path) -> None:
+    text = (
+        FRONT.replace("Our method helps agents.", "Success rises from 39.3% to 58.4%.")
+        .replace("We study them.", "We contribute:\n\n- a dataset\n- a model")
+        .replace("Table 1: Hyperparameters.", "Table 1: Comparison with existing benchmarks.")
+    )
+    assert (await run(tmp_path, text)).status == "pass"
+
+
+async def test_front_matter_checks_are_configurable(tmp_path: Path) -> None:
+    result = await run(
+        tmp_path,
+        FRONT.replace("Agents are useful.", "Our contributions are two."),
+        abstract_requires_number=False,
+        require_positioning_table=False,
+    )
+    assert result.status == "pass"
+
+
+async def test_late_first_figure_is_reported(tmp_path: Path) -> None:
+    text = CLEAN.replace("# Results", "# Method\n\n" + "word " * 60 + "\n\n# Results")
+    result = await run(tmp_path, text, first_figure_within_words=50)
+    assert titles(result) == ["First figure appears after more than 50 words"]
+
+
+async def test_latex_front_matter_is_understood(tmp_path: Path) -> None:
+    text = (
+        "\\begin{abstract}Gains of 19.1 points.\\end{abstract}\n"
+        "\\section{Introduction}\n\\begin{itemize}\\item one\\end{itemize}\n"
+        "\\section{Related Work}\nPrior.\n"
+        "\\begin{table}\\caption{Comparison with prior work}\\end{table}\n"
+        "\\begin{figure}\\label{fig:a}\\end{figure} See \\ref{fig:a}.\n"
+    )
+    assert (await run(tmp_path, text)).status == "pass"

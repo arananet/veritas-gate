@@ -9,6 +9,12 @@ These are patterns, so a check finds them for nothing and a judge is left the
 questions that need judgement.
 
 Also reported: figures the text never cites, and a paper with no figure at all.
+
+The front matter is where a paper is triaged. A preprint that got read
+(SkillGym, 2026) put its headline numbers in the abstract, a comparison figure
+on page 2, three contribution bullets in the introduction and a table against
+fourteen prior benchmarks; a desk-rejected one put its limitations there
+instead. Each of those four is a pattern, so this check reports their absence.
 """
 
 from __future__ import annotations
@@ -69,6 +75,16 @@ _DISCLAIMER = re.compile(
 )
 _SENTENCE = re.compile(r"(?<=[.;])\s+(?=[A-Z(])")
 
+# A number that reports a result: a percentage, a difference in points, a
+# ratio, a decimal, or a comparison ("from 39 to 58", "51.5 versus 50.1").
+_RESULT_NUMBER = re.compile(
+    r"(?i)\b\d+(?:\.\d+)?\s*(?:%|pp\b|percentage points?|points?\b|\u00d7|-?fold\b)"
+    r"|\b\d+\.\d+\b|\b(?:from|to|vs\.?|versus|of)\s+\d"
+)
+_POSITIONING = re.compile(r"(?i)compar|prior work|existing|related|versus|\bvs\.?\s|position")
+_MD_TABLE_CAPTION = re.compile(r"(?im)^\s*(?:Table\s*\d*\s*[:.]|:\s+\S)(.*)$")
+_TEX_TABLE = re.compile(r"\\begin\{table\*?\}(.*?)\\end\{table\*?\}", re.S)
+_LIST_ITEM = re.compile(r"(?m)^\s*(?:[-*+]\s|\d+[.)]\s)|\\item\b")
 _HEX = re.compile(r"\b[0-9a-f]{20,64}\b")
 _MD_IMAGE = re.compile(r"!\[[^\]]*\]\(([^)\s]+)[^)]*\)(\{#([\w:.-]+)[^}]*\})?")
 _TEX_FIGURE = re.compile(r"\\begin\{figure\*?\}(.*?)\\end\{figure\*?\}", re.S)
@@ -97,6 +113,7 @@ class PresentationCheck:
         self._repeated_identifiers(target, text)
         self._abstract(target, text)
         self._figures(target, text)
+        self._front_matter(target, text)
         status: Literal["pass", "fail"] = "fail" if self.findings else "pass"
         summary = (
             "no presentation problems found"
@@ -242,6 +259,71 @@ class PresentationCheck:
                     f"Reference it (\\ref{{{label}}} or @{label}) where it is discussed.",
                 )
 
+    def _front_matter(self, target: str, text: str) -> None:
+        """What an editor sees first: a number, contributions, positioning, a figure."""
+        abstract = _section(text, r"abstract")
+        if (
+            abstract is not None
+            and self.config.abstract_requires_number
+            and not _RESULT_NUMBER.search(abstract)
+        ):
+            self._add(
+                "Abstract reports no quantitative result",
+                "minor",
+                "An editor triaging on the abstract looks for what was found and how "
+                "much. Without a number the finding cannot be repeated after one read.",
+                target,
+                "State the main result with its number and comparison ('X raises Y from "
+                "A to B on N tasks'), using only numbers the paper reports. For a formal "
+                "result, state the theorem; set abstract_requires_number: false.",
+            )
+        intro = _section(text, r"introduction")
+        if (
+            intro is not None
+            and not _LIST_ITEM.search(intro)
+            and not re.search(r"(?i)\bcontribut", intro)
+        ):
+            self._add(
+                "Introduction does not list its contributions",
+                "minor",
+                "Accepted papers name their contributions in the introduction, usually "
+                "as a short list, so a reader knows what to evaluate.",
+                target,
+                "End the introduction with two to four contribution bullets, each "
+                "pointing to the section and result that supports it.",
+            )
+        related = _section(text, r"related\s+work|background|prior\s+work")
+        captions = [m.group(1) for m in _MD_TABLE_CAPTION.finditer(text)]
+        for block in _TEX_TABLE.findall(text):
+            captions.extend(re.findall(r"\\caption\{([^}]*)", block))
+        if (
+            related is not None
+            and self.config.require_positioning_table
+            and not any(_POSITIONING.search(c) for c in captions)
+        ):
+            self._add(
+                "No table positions the work against prior work",
+                "minor",
+                "Related work in prose leaves the reader to work out what is new. A "
+                "table of prior work against the properties this work claims shows it "
+                "in one look.",
+                target,
+                "Add a comparison table: rows are prior works cited in Related Work, "
+                "columns the properties this paper claims, this work as the last row.",
+            )
+        first = _first_figure(text)
+        limit = self.config.first_figure_within_words
+        if first is not None and len(re.findall(r"\w+", text[:first])) > limit:
+            self._add(
+                f"First figure appears after more than {limit} words",
+                "minor",
+                "A figure near the start (the main result, or the method at a glance) "
+                "is what most readers look at before deciding to read on.",
+                target,
+                "Move or add a main-result or overview figure to the first two pages, "
+                "generated from the evidence.",
+            )
+
     def _add(
         self,
         title: str,
@@ -263,3 +345,26 @@ class PresentationCheck:
                 recommendation=recommendation,
             )
         )
+
+
+def _section(text: str, name: str) -> str | None:
+    """Body of a Markdown or LaTeX section whose title matches ``name``."""
+    markdown = re.search(
+        rf"(?im)^#+\s*(?:\d+\.?\s*)?(?:{name})\b[^\n]*\n(.*?)(?=^#+\s|\Z)", text, re.S
+    )
+    if markdown:
+        return markdown.group(1)
+    if re.fullmatch(r"abstract", name):
+        latex = re.search(r"\\begin\{abstract\}(.*?)\\end\{abstract\}", text, re.S)
+        return latex.group(1) if latex else None
+    latex = re.search(
+        rf"(?i)\\section\*?\{{(?:{name})[^}}]*\}}(.*?)(?=\\section|\\end\{{document\}}|\Z)",
+        text,
+        re.S,
+    )
+    return latex.group(1) if latex else None
+
+
+def _first_figure(text: str) -> int | None:
+    positions = [m.start() for m in (_MD_IMAGE.search(text), _TEX_FIGURE.search(text)) if m]
+    return min(positions) if positions else None

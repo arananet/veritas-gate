@@ -213,6 +213,11 @@ class CheckConfig(BaseModel):
     # Share of abstract sentences that disclaim rather than report (presentation).
     abstract_max_disclaimer_ratio: float = 0.25
     require_figures: bool = True
+    # Front matter (presentation): a number in the abstract, a positioning
+    # table when there is a related-work section, and an early first figure.
+    abstract_requires_number: bool = True
+    require_positioning_table: bool = True
+    first_figure_within_words: int = 1500
     # For pdf-inspection and venue: `target` is the built PDF, `source` the
     # LaTeX. `venue` names the rules (tmlr, arxiv, preprint); identity_terms
     # adds strings to hide beyond those read from CITATION.cff and the remote.

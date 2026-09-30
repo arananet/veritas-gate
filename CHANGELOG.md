@@ -23,6 +23,12 @@ Guidelines:
 
 ### Added
 
+- Presentation reports weak front matter: an abstract with no quantitative
+  result, an introduction without contributions, related work without a
+  positioning table, and a first figure far into the paper. A `scale` judge
+  compares the evidence with comparable accepted work and marks gaps
+  "Requires new work:" for the author; desk-triage names both cues
+  (spec: front-matter-and-scale).
 - Presentation reports an abstract crowded with disclaimers, sentences that
   state what the work does not show, above `abstract_max_disclaimer_ratio`
   (default 0.25). Advisory; it recommends relocating limitations, never

@@ -76,6 +76,12 @@ judges:
     version: "1"
     description: Simulates an editor deciding from the abstract and first page whether to send the paper to review.
 
+  - name: scale
+    prompt: scale.md
+    model_role: scale
+    version: "1"
+    description: Whether the evidence is at the scale of comparable accepted work, and positioned against it.
+
   - name: adversarial
     prompt: adversarial.md
     model_role: adversarial

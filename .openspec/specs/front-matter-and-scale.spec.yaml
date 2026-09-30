@@ -1,0 +1,52 @@
+---
+title: Report weak front matter, and judge evidence scale against accepted work
+slug: front-matter-and-scale
+type: feature
+status: review
+author: Claude
+created_at: '2026-09-30'
+updated_at: '2026-09-30'
+roles:
+  implementer: '@arananet'
+  reviewer: '@arananet'
+  qa: '@arananet'
+  product_owner: '@arananet'
+description: |
+  After a desk rejection, the reasons were found by comparing the manuscript
+  by hand with a preprint that was read (SkillGym, 2026): headline numbers in
+  the abstract, three contribution bullets, a comparison figure on page 2, a
+  table against fourteen prior benchmarks, and evidence at the scale of
+  thousands of tasks, several models and ablations. That comparison should be
+  the gate's, not an assistant's.
+
+  The presentation check now reports an abstract without a quantitative
+  result, an introduction without contributions, a related-work section
+  without a positioning table, and a first figure far into the paper. A scale
+  judge compares the evidence with what comparable accepted work reports and
+  marks each gap "Requires new work:" with disposition decision, so the loop
+  stops for the author instead of rewording. Desk-triage names both cues.
+acceptance_criteria:
+- "Given an abstract without a percentage, point difference, decimal or comparison, when presentation runs, then a minor finding is reported; abstract_requires_number false disables it."
+- "Given an introduction with neither a list nor the word contribution, when presentation runs, then a minor finding is reported."
+- "Given a related-work section and no table caption about comparison or prior work, when presentation runs, then a minor finding is reported; require_positioning_table false disables it."
+- "Given a first figure after first_figure_within_words (default 1500) words, when presentation runs, then a minor finding is reported."
+- "Given the same front matter in LaTeX, when presentation runs, then it is understood."
+- "Given the scientific-paper profile, then it declares a scale judge whose new-work findings carry disposition decision and 'Requires new work:'."
+test_plan:
+- 'tests/test_check_presentation.py covers the first five criteria; tests/test_config.py the judge list.'
+qa_notes: |
+  The accepted formal paper among the fixtures has no number in its abstract;
+  the finding is advisory and its recommendation names the opt-out for formal
+  results.
+out_of_scope:
+- Fetching accepted papers from a venue to calibrate scale; the judge relies on the model's knowledge of the venue.
+- Blocking on front-matter findings; all are minor.
+implementation_skill:
+eval_plan:
+  scenarios:
+  - Run scale on the desk-rejected benchmark and on SkillGym, and record whether it asks the first for new work and not the second.
+  metrics: []
+technical_notes: |
+  Section bodies are found by Markdown heading or \section title; table
+  captions by "Table N:", Pandoc ": caption" lines, or \caption in a table
+  environment.
